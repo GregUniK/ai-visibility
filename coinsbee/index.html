@@ -429,12 +429,12 @@ function renderOverview(){
 function renderStats(){
   var bk=BRAND_CFG[currentBrand].key,pd=D.prompts[bk],totalRuns=0,mentioned=0;
   pd.forEach(function(p){
-    if(activeModel==='all'){totalRuns+=p.totalRuns;if(p.mentions>0)mentioned++;}
+    if(activeModel==='all'){totalRuns+=p.totalRuns;mentioned+=p.mentions;}
     else{var mr=p.models[activeModel];if(mr){totalRuns++;if(mr.mentioned)mentioned++;}}
   });
   var promptsMentioned=pd.filter(function(p){return activeModel==='all'?p.mentions>0:(p.models[activeModel]&&p.models[activeModel].mentioned);}).length;
-  var visPct=(promptsMentioned/pd.length*100).toFixed(1);
-  var visCls=promptsMentioned===0?'bad':parseFloat(visPct)<5?'warn':'good';
+  var visPct=totalRuns>0?(mentioned/totalRuns*100).toFixed(1):'0.0';
+  var visCls=mentioned===0?'bad':parseFloat(visPct)<5?'warn':'good';
   var bestScore=Math.max.apply(null,pd.map(function(p){
     if(activeModel==='all'){
       return Math.max.apply(null,Object.values(p.models).filter(function(m){return m&&m.score;}).map(function(m){return m.score;}).concat([0]));
@@ -464,8 +464,8 @@ function renderStats(){
   var posCls=avgPos===null?'bad':parseFloat(avgPos)<=2?'good':parseFloat(avgPos)<=4?'warn':'bad';
   var infoSvg='<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="6"/><path d="M7 6v4" stroke-linecap="round"/><circle cx="7" cy="4.5" r=".5" fill="currentColor" stroke="none"/></svg>';
   document.getElementById('statRow').innerHTML=
-    '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Percentage of tracked prompts where the brand was mentioned by at least one AI model">'+infoSvg+'</span>AI Visibility</div><div class="sc-val '+visCls+'">'+visPct+'%</div><div class="sc-sub">'+promptsMentioned+' of '+pd.length+' prompts trigger a mention</div></div>'+
-    '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Total number of individual AI model query executions across all prompts">'+infoSvg+'</span>Model Runs</div><div class="sc-val">'+totalRuns+'</div><div class="sc-sub">'+mentioned+' runs with brand mention</div></div>'+
+    '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Brand mentions as a share of all AI model runs (prompts × models). Reflects true average visibility across every query and model.">'+infoSvg+'</span>AI Visibility</div><div class="sc-val '+visCls+'">'+visPct+'%</div><div class="sc-sub">'+mentioned+' mentions across '+totalRuns+' model runs</div></div>'+
+    '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Total number of individual AI model query executions across all prompts">'+infoSvg+'</span>Model Runs</div><div class="sc-val">'+totalRuns+'</div><div class="sc-sub">'+promptsMentioned+' of '+pd.length+' prompts trigger a mention</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Highest AI visibility score (0-100) achieved across all prompts and models. Score reflects prominence and rank in the AI response">'+infoSvg+'</span>Best Score</div><div class="sc-val '+(bestScore>0?'good':'bad')+'">'+(bestScore>0?bestScore:'None')+'</div><div class="sc-sub">'+(bestScore===100?'Rank 1 by Perplexity':bestScore>0?'highest ranking':'not ranked by any model')+'</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Total number of source URLs cited by AI models when answering prompts in this brand\'s topic area">'+infoSvg+'</span>Total Citations</div><div class="sc-val" style="color:var(--v)">'+citTotal.toLocaleString()+'</div><div class="sc-sub">'+c.uniqueDomains+' unique domains</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Share of brand mentions rated as positive sentiment out of all detected mentions">'+infoSvg+'</span>Sentiment Score</div><div class="sc-val '+(sentPct===null?'bad':sentCls)+'">'+(sentPct!==null?sentPct+'%':'N/A')+'</div><div class="sc-sub">'+(sentTotal>0?sentPos+' positive of '+sentTotal+' mentions':'no mentions detected')+'</div></div>'+
