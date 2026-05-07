@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scheduled Tasks — Greg UniK SEO</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:32px 24px}
+  h1{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:4px}
+  .subtitle{font-size:.85rem;color:#64748b;margin-bottom:32px}
+  .section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;margin:32px 0 12px}
+  .card{background:#1e2330;border:1px solid #2a3040;border-radius:12px;padding:20px 24px;margin-bottom:12px;display:flex;align-items:flex-start;gap:20px}
+  .card.highlight{border-color:#3b82f6;background:#1a2340}
+  .card.error{border-color:#ef4444;background:#1f1a1a}
+  .card.system{opacity:.6}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+  .dot.ready{background:#22c55e}
+  .dot.running{background:#3b82f6}
+  .dot.disabled{background:#475569}
+  .dot.error{background:#ef4444}
+  .card-body{flex:1;min-width:0}
+  .card-name{font-size:.95rem;font-weight:600;color:#f1f5f9;margin-bottom:4px}
+  .card-desc{font-size:.8rem;color:#64748b;margin-bottom:12px;line-height:1.5}
+  .meta{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:.72rem;padding:3px 10px;border-radius:20px;background:#2a3040;color:#94a3b8;white-space:nowrap}
+  .chip.green{background:#14301a;color:#4ade80}
+  .chip.red{background:#301414;color:#f87171}
+  .chip.blue{background:#14233a;color:#60a5fa}
+  .chip.yellow{background:#2e2700;color:#facc15}
+  .cmd{font-size:.72rem;color:#475569;margin-top:10px;font-family:'Courier New',monospace;word-break:break-all;line-height:1.5}
+  .updated{font-size:.75rem;color:#334155;text-align:right;margin-top:24px}
+  a{color:#3b82f6;text-decoration:none}
+  .badge{display:inline-block;font-size:.65rem;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:#1d3461;color:#60a5fa;margin-left:8px;vertical-align:middle}
+  .badge.seo{background:#1a3320;color:#4ade80}
+</style>
+</head>
+<body>
+
+<h1>Scheduled Tasks <span style="color:#475569;font-weight:400">— Greg UniK SEO</span></h1>
+<p class="subtitle">Windows Task Scheduler overview &middot; All tasks registered on this machine</p>
+
+<div class="section-title">SEO / Claude Automation</div>
+
+<div class="card highlight">
+  <div class="dot ready"></div>
+  <div class="card-body">
+    <div class="card-name">AIVisibility_WeeklyRefresh <span class="badge seo">SEO</span></div>
+    <div class="card-desc">Weekly refresh of all ai-visibility client reports (PeekABoo data + GitHub Pages deploy). Deletes caches, rebuilds 12 brand reports, commits and pushes to <a href="https://gregunik.github.io/ai-visibility/" target="_blank">gregunik.github.io/ai-visibility</a>.</div>
+    <div class="meta">
+      <span class="chip blue">Every Monday 09:00</span>
+      <span class="chip green">Ready</span>
+      <span class="chip">Next: Mon 12 May 2026 09:00</span>
+      <span class="chip">Last run: never (just registered)</span>
+      <span class="chip">Log: CLAUDE_SEO_TESTS\refresh_ai_visibility.log</span>
+    </div>
+    <div class="cmd">powershell.exe -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Greg\CLAUDE_SEO_TESTS\refresh_ai_visibility.ps1"</div>
+  </div>
+</div>
+
+<div class="card highlight">
+  <div class="dot ready"></div>
+  <div class="card-body">
+    <div class="card-name">UniK SEO Monthly Performance Report <span class="badge seo">SEO</span></div>
+    <div class="card-desc">Generates monthly SEO performance reports for all UniK SEO active clients. Invokes claude headlessly with the prompt at _misc\monthly-report\prompt.md. First Tuesday of each month at 11:00.</div>
+    <div class="meta">
+      <span class="chip blue">1st Tuesday of month 11:00</span>
+      <span class="chip green">Ready</span>
+      <span class="chip">Next: 02 Jun 2026 11:00</span>
+      <span class="chip">Last run: ~04 May 2026</span>
+      <span class="chip yellow">Last result: terminated (exit 0xC000013A)</span>
+    </div>
+    <div class="cmd">powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Greg\CLAUDE_SEO_TESTS\_misc\monthly-report\run.ps1"</div>
+  </div>
+</div>
+
+<div class="section-title">System / Third-party</div>
+
+<div class="card system">
+  <div class="dot ready"></div>
+  <div class="card-body">
+    <div class="card-name">Adobe Acrobat Update Task</div>
+    <div class="card-desc">Keeps Adobe Reader and Acrobat up to date.</div>
+    <div class="meta">
+      <span class="chip">Daily 16:00 + on logon</span>
+      <span class="chip green">Ready</span>
+    </div>
+  </div>
+</div>
+
+<div class="card system">
+  <div class="dot ready"></div>
+  <div class="card-body">
+    <div class="card-name">NvProfileUpdaterDaily / NvProfileUpdaterOnLogon</div>
+    <div class="card-desc">NVIDIA Profile Updater — keeps GPU driver profiles current.</div>
+    <div class="meta">
+      <span class="chip">Daily + on logon</span>
+      <span class="chip green">Ready</span>
+    </div>
+  </div>
+</div>
+
+<div class="card system">
+  <div class="dot ready"></div>
+  <div class="card-body">
+    <div class="card-name">NitroSenseLauncher / QuickPanelLauncher</div>
+    <div class="card-desc">Acer hardware utilities (NitroSense, QuickPanel) — launched at logon.</div>
+    <div class="meta">
+      <span class="chip">On logon</span>
+      <span class="chip green">Ready</span>
+    </div>
+  </div>
+</div>
+
+<div class="card system">
+  <div class="dot disabled"></div>
+  <div class="card-body">
+    <div class="card-name">StorPSCTL</div>
+    <div class="card-desc">Acer storage power control (NVMe runtime PS, thermal control, HDD APM).</div>
+    <div class="meta">
+      <span class="chip">On logon</span>
+      <span class="chip">Disabled</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">How to manage tasks</div>
+<div class="card">
+  <div class="dot" style="background:#475569"></div>
+  <div class="card-body">
+    <div class="card-name">Windows Task Scheduler GUI</div>
+    <div class="card-desc">Open <strong>Task Scheduler</strong> from the Start menu, or run <code style="background:#2a3040;padding:1px 6px;border-radius:4px;font-size:.8rem">taskschd.msc</code> in Run (Win+R). All tasks above are listed under Task Scheduler Library.</div>
+    <div class="meta">
+      <span class="chip">View history: right-click task → History tab</span>
+      <span class="chip">Run manually: right-click → Run</span>
+      <span class="chip">Edit: right-click → Properties</span>
+      <span class="chip">Delete: right-click → Delete</span>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="dot" style="background:#475569"></div>
+  <div class="card-body">
+    <div class="card-name">From PowerShell</div>
+    <div class="card-desc">Quick commands to manage tasks from the terminal.</div>
+    <div class="cmd">
+      Get-ScheduledTask | Where TaskPath -eq "\"  &nbsp;&nbsp;&nbsp;# list all root tasks<br>
+      Start-ScheduledTask "AIVisibility_WeeklyRefresh"  &nbsp;&nbsp;&nbsp;# run immediately<br>
+      Disable-ScheduledTask "AIVisibility_WeeklyRefresh"  &nbsp;&nbsp;&nbsp;# pause<br>
+      Unregister-ScheduledTask "AIVisibility_WeeklyRefresh"  &nbsp;&nbsp;&nbsp;# delete
+    </div>
+  </div>
+</div>
+
+<div class="updated">Last updated: 07 May 2026 &middot; <a href="https://gregunik.github.io/ai-visibility/" target="_blank">ai-visibility reports</a> &middot; <a href="https://gregunik.github.io/sales/" target="_blank">sales reports</a></div>
+
+</body>
+</html>
