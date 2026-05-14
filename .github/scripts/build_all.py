@@ -29,16 +29,34 @@ src = build_fast_path.read_text(encoding="utf-8")
 NLP_OLD = '    llm_cfg = {\n        "provider": provider,\n        "api_key": llm_api_key,\n        "model": llm_model,\n        "base_url": llm_base_url,\n    }'
 NLP_NEW = '    llm_cfg = None if cfg.get("skip_nlp") else {\n        "provider": provider,\n        "api_key": llm_api_key,\n        "model": llm_model,\n        "base_url": llm_base_url,\n    }'
 
+ACT_OLD = '        ACTIONS[brand_key] = generate_actions(cfg, brand_name, brand_domain, brand_data)'
+ACT_NEW = '        ACTIONS[brand_key] = [] if cfg.get("skip_nlp") else generate_actions(cfg, brand_name, brand_domain, brand_data)'
+
+patched = False
 if NLP_OLD in src:
-    build_fast_path.write_text(src.replace(NLP_OLD, NLP_NEW), encoding="utf-8")
-    print("Patched build_fast.py: skip_nlp support added")
+    src = src.replace(NLP_OLD, NLP_NEW)
+    patched = True
+    print("Patched build_fast.py: skip_nlp support added (NLP pass)")
 else:
-    print("WARNING: could not apply skip_nlp patch (upstream may have changed)")
+    print("WARNING: could not apply skip_nlp NLP patch (upstream may have changed)")
+
+if ACT_OLD in src:
+    src = src.replace(ACT_OLD, ACT_NEW)
+    patched = True
+    print("Patched build_fast.py: skip_nlp support added (action generation)")
+else:
+    print("WARNING: could not apply skip_nlp actions patch (upstream may have changed)")
+
+if patched:
+    build_fast_path.write_text(src, encoding="utf-8")
 
 # ── Build each client ──────────────────────────────────────────────────────────
 CLIENTS = [
-    "coinsbee", "credibom", "elcorteingles", "era",
-    "leroymerlin", "reduniq", "unikseo", "visitmadeira", "xtb"
+    # elcorteingles and leroymerlin are registered under separate PeekaBoo accounts
+    # (different API keys) — they 404 with the shared AIPEEKABOO_API_KEY.
+    # Re-add them once per-brand secrets are configured.
+    "coinsbee", "credibom", "era",
+    "reduniq", "unikseo", "visitmadeira", "xtb"
 ]
 
 failed = []
