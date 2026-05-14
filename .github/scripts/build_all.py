@@ -4,7 +4,7 @@ the repo folder structure ready for git commit.
 
 Reads brand configs from configs/<slug>.json (no API key stored there).
 Injects AIPEEKABOO_API_KEY from environment.
-Skips NLP and action generation (skip_nlp: true, actions stubs from stubs/).
+Patches build_fast.py from upstream to support skip_nlp (no LLM calls).
 """
 import json, os, shutil, subprocess, sys, pathlib
 
@@ -19,6 +19,23 @@ API_KEY = os.environ.get("AIPEEKABOO_API_KEY", "")
 if not API_KEY:
     sys.exit("ERROR: AIPEEKABOO_API_KEY env var not set")
 
+# ── Patch upstream build_fast.py to support skip_nlp ──────────────────────────
+# The upstream build_fast.py has no skip_nlp support. We patch it once so that
+# setting skip_nlp:true in a config bypasses both NLP extraction and action
+# generation — zero LLM calls, zero tokens.
+build_fast_path = BUILD_DIR / "build_fast.py"
+src = build_fast_path.read_text(encoding="utf-8")
+
+NLP_OLD = '    llm_cfg = {\n        "provider": provider,\n        "api_key": llm_api_key,\n        "model": llm_model,\n        "base_url": llm_base_url,\n    }'
+NLP_NEW = '    llm_cfg = None if cfg.get("skip_nlp") else {\n        "provider": provider,\n        "api_key": llm_api_key,\n        "model": llm_model,\n        "base_url": llm_base_url,\n    }'
+
+if NLP_OLD in src:
+    build_fast_path.write_text(src.replace(NLP_OLD, NLP_NEW), encoding="utf-8")
+    print("Patched build_fast.py: skip_nlp support added")
+else:
+    print("WARNING: could not apply skip_nlp patch (upstream may have changed)")
+
+# ── Build each client ──────────────────────────────────────────────────────────
 CLIENTS = [
     "coinsbee", "credibom", "elcorteingles", "era",
     "leroymerlin", "reduniq", "unikseo", "visitmadeira", "xtb"
@@ -29,26 +46,23 @@ failed = []
 for slug in CLIENTS:
     print(f"\n{'='*40}\n{slug}\n{'='*40}")
 
-    # Load brand config and inject API key
+    # Load brand config and inject API key + skip_nlp flag
     cfg_path = CONFIGS / f"{slug}.json"
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     cfg["aipeekaboo_api_key"] = API_KEY
     cfg["skip_nlp"] = True
-    cfg["llm_provider"] = "claude-cli"   # keeps llm_api_key check quiet
+    cfg["llm_provider"] = "claude-cli"   # skips llm_api_key validation check
 
-    # Write temp config into build dir
+    # Write temp config
     tmp_cfg = TMP / f"config_{slug}.json"
     tmp_cfg.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
-    # Copy actions stub so action generation is skipped
-    stub_src = STUBS / f"{slug}.json"
-    stub_dst = BUILD_DIR / f"actions_{slug}.json"
-    shutil.copy(stub_src, stub_dst)
+    # Copy actions stub → action generation is skipped (file already exists)
+    shutil.copy(STUBS / f"{slug}.json", BUILD_DIR / f"actions_{slug}.json")
 
     # Run build
     result = subprocess.run(
-        [sys.executable, str(BUILD_DIR / "build_fast.py"),
-         "--config", str(tmp_cfg)],
+        [sys.executable, str(BUILD_DIR / "build_fast.py"), "--config", str(tmp_cfg)],
         cwd=str(BUILD_DIR),
         capture_output=False
     )
@@ -64,10 +78,10 @@ for slug in CLIENTS:
     dst_dir  = ROOT / slug
     dst_dir.mkdir(exist_ok=True)
     shutil.copy(src_html, dst_dir / "index.html")
-    print(f"  -> copied to {slug}/index.html")
+    print(f"  -> {slug}/index.html")
 
 if failed:
-    print(f"\nFailed clients: {failed}")
+    print(f"\nFailed: {failed}")
     sys.exit(1)
 
 print("\nAll clients built successfully.")
