@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "dc06b75c-3f23-4cd1-9408-0c060af3249b",
+      "name": "REDUNIQ",
+      "key": "reduniq",
+      "domain": "reduniq.pt"
+    }
+  ],
+  "output_file": "reduniq-report.html"
+}

@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "532fae30-0f00-4a14-9730-e1906dc6a453",
+      "name": "Leroy Merlin",
+      "key": "leroymerlin",
+      "domain": "leroymerlin.pt"
+    }
+  ],
+  "output_file": "leroymerlin-report.html"
+}

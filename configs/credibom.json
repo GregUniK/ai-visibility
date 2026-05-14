@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "aae14d92-ccdd-4daa-8abe-2ffcad034e74",
+      "name": "Credibom",
+      "key": "credibom",
+      "domain": "credibom.pt"
+    }
+  ],
+  "output_file": "credibom-report.html"
+}

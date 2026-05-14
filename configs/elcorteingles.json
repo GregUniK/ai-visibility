@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "b2172ee8-0472-43b2-9b0c-7b575a6061bb",
+      "name": "El Corte InglÃ©s",
+      "key": "elcorteingles",
+      "domain": "elcorteingles.pt"
+    }
+  ],
+  "output_file": "elcorteingles-report.html"
+}

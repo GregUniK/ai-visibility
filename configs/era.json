@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "c35369a7-0f81-4470-b480-11d268d83b54",
+      "name": "ERA Imobiliaria",
+      "key": "era",
+      "domain": "era.pt"
+    }
+  ],
+  "output_file": "era-report.html"
+}

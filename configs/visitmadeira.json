@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "67a5ba8a-6c08-4d3f-85b9-640b2559db1b",
+      "name": "Visitmadeira",
+      "key": "visitmadeira",
+      "domain": "visitmadeira.pt"
+    }
+  ],
+  "output_file": "visitmadeira-report.html"
+}

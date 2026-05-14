@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "501fbd2b-60fe-4f50-93d4-53d08f997b53",
+      "name": "UniK SEO",
+      "key": "unikseo",
+      "domain": "unik-seo.com"
+    }
+  ],
+  "output_file": "unikseo-report.html"
+}

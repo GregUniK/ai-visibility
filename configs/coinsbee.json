@@ -1,0 +1,12 @@
+{
+  "brands": [
+    {
+      "id": "9e9305f4-7853-4c69-9338-70e37bff23af",
+      "name": "CoinsBee",
+      "key": "coinsbee",
+      "domain": "coinsbee.com"
+    }
+  ],
+  "report_title": "CoinsBee AI Visibility Report",
+  "output_file": "coinsbee-report.html"
+}
