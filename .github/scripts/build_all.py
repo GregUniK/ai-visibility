@@ -3,8 +3,14 @@ build_all.py — builds all ai-visibility client reports and copies them into
 the repo folder structure ready for git commit.
 
 Reads brand configs from configs/<slug>.json (no API key stored there).
-Injects AIPEEKABOO_API_KEY from environment.
+Each config may specify an "api_key_env" field naming which GitHub secret
+to use; defaults to AIPEEKABOO_API_KEY.
 Patches build_fast.py from upstream to support skip_nlp (no LLM calls).
+
+GitHub secrets required:
+  AIPEEKABOO_API_KEY      — main account (pk_3c86bc8c...) — most clients
+  AIPEEKABOO_API_KEY_ECI  — El Corte Inglés account (pk_7ca3f413...)
+  AIPEEKABOO_API_KEY_LM   — Leroy Merlin account (pk_2470d153...)
 """
 import json, os, shutil, subprocess, sys, pathlib
 
@@ -15,8 +21,15 @@ STUBS     = ROOT / "stubs"
 TMP       = pathlib.Path("/tmp/ai-visibility-build")
 TMP.mkdir(exist_ok=True)
 
-API_KEY = os.environ.get("AIPEEKABOO_API_KEY", "")
-if not API_KEY:
+# Load all available API keys from environment
+API_KEYS = {
+    "AIPEEKABOO_API_KEY":     os.environ.get("AIPEEKABOO_API_KEY", ""),
+    "AIPEEKABOO_API_KEY_ECI": os.environ.get("AIPEEKABOO_API_KEY_ECI", ""),
+    "AIPEEKABOO_API_KEY_LM":  os.environ.get("AIPEEKABOO_API_KEY_LM", ""),
+}
+
+# Fail fast if main key is missing; warn only for optional ones
+if not API_KEYS["AIPEEKABOO_API_KEY"]:
     sys.exit("ERROR: AIPEEKABOO_API_KEY env var not set")
 
 # ── Patch upstream build_fast.py to support skip_nlp ──────────────────────────
@@ -51,12 +64,11 @@ if patched:
     build_fast_path.write_text(src, encoding="utf-8")
 
 # ── Build each client ──────────────────────────────────────────────────────────
+# Each config file may include "api_key_env": "<SECRET_NAME>" to select which
+# GitHub secret holds its PeekaBoo API key. Defaults to AIPEEKABOO_API_KEY.
 CLIENTS = [
-    # elcorteingles and leroymerlin are registered under separate PeekaBoo accounts
-    # (different API keys) — they 404 with the shared AIPEEKABOO_API_KEY.
-    # Re-add them once per-brand secrets are configured.
-    "coinsbee", "credibom", "era",
-    "reduniq", "unikseo", "visitmadeira", "xtb"
+    "coinsbee", "credibom", "elcorteingles", "era",
+    "leroymerlin", "reduniq", "unikseo", "visitmadeira", "xtb"
 ]
 
 failed = []
@@ -64,10 +76,19 @@ failed = []
 for slug in CLIENTS:
     print(f"\n{'='*40}\n{slug}\n{'='*40}")
 
-    # Load brand config and inject API key + skip_nlp flag
+    # Load brand config
     cfg_path = CONFIGS / f"{slug}.json"
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-    cfg["aipeekaboo_api_key"] = API_KEY
+
+    # Resolve the correct API key for this client
+    key_env = cfg.get("api_key_env", "AIPEEKABOO_API_KEY")
+    api_key = API_KEYS.get(key_env, "")
+    if not api_key:
+        print(f"  SKIPPED: {slug} — secret {key_env!r} not set in environment")
+        failed.append(slug)
+        continue
+
+    cfg["aipeekaboo_api_key"] = api_key
     cfg["skip_nlp"] = True
     cfg["llm_provider"] = "claude-cli"   # skips llm_api_key validation check
 

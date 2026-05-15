@@ -1,4 +1,5 @@
 {
+  "api_key_env": "AIPEEKABOO_API_KEY_LM",
   "brands": [
     {
       "id": "532fae30-0f00-4a14-9730-e1906dc6a453",
