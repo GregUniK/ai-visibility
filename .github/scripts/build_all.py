@@ -109,7 +109,14 @@ for slug in CLIENTS:
     src_html = BUILD_DIR / out_file
     dst_dir  = ROOT / slug
     dst_dir.mkdir(exist_ok=True)
-    shutil.copy(src_html, dst_dir / "index.html")
+
+    # Inject noindex so reports are never crawled by search engines
+    html = src_html.read_text(encoding="utf-8")
+    NOINDEX = '<meta name="robots" content="noindex,nofollow">'
+    if NOINDEX not in html:
+        html = html.replace("<head>", f"<head>\n  {NOINDEX}", 1)
+    (dst_dir / "index.html").write_text(html, encoding="utf-8")
+
     print(f"  -> {slug}/index.html")
     succeeded.append(slug)
 
