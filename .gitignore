@@ -1,0 +1,7 @@
+# Build tools are cloned fresh in CI — never commit this folder
+build-tools/
+
+# Temp files
+/tmp/
+*.pyc
+__pycache__/
