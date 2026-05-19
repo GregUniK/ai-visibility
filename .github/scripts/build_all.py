@@ -110,11 +110,27 @@ for slug in CLIENTS:
     dst_dir  = ROOT / slug
     dst_dir.mkdir(exist_ok=True)
 
-    # Inject noindex so reports are never crawled by search engines
+    # Post-process HTML: inject noindex + remove Actions tab
     html = src_html.read_text(encoding="utf-8")
+
     NOINDEX = '<meta name="robots" content="noindex,nofollow">'
     if NOINDEX not in html:
         html = html.replace("<head>", f"<head>\n  {NOINDEX}", 1)
+
+    html = html.replace('<button class="stab" onclick="switchTab(\'actions\',this)">Actions</button>', '')
+    tag = '<div id="panel-actions"'
+    start = html.find(tag)
+    if start != -1:
+        depth, i = 0, start
+        while i < len(html):
+            if html[i:i+4] == '<div': depth += 1
+            elif html[i:i+6] == '</div>':
+                depth -= 1
+                if depth == 0:
+                    html = html[:start] + html[i+6:]
+                    break
+            i += 1
+
     (dst_dir / "index.html").write_text(html, encoding="utf-8")
 
     print(f"  -> {slug}/index.html")
