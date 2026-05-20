@@ -31,6 +31,10 @@ API_KEYS = {
 if not API_KEYS["AIPEEKABOO_API_KEY"]:
     sys.exit("ERROR: AIPEEKABOO_API_KEY env var not set")
 
+# Debug: show first 20 chars of each key so we can verify secrets in CI logs
+for k, v in API_KEYS.items():
+    print(f"  {k}: {'[not set]' if not v else v[:20] + '...'}")
+
 # ── Patch upstream build_fast.py to support skip_nlp ──────────────────────────
 build_fast_path = BUILD_DIR / "build_fast.py"
 src = build_fast_path.read_text(encoding="utf-8")
