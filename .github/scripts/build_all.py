@@ -33,7 +33,7 @@ if not API_KEYS["AIPEEKABOO_API_KEY"]:
 
 # Debug: show first 20 chars of each key so we can verify secrets in CI logs
 for k, v in API_KEYS.items():
-    print(f"  {k}: {'[not set]' if not v else v[:20] + '...'}")
+    print(f"  {k}: {'[not set]' if not v else '...'+v[-6:]}")
 
 # ── Patch upstream build_fast.py to support skip_nlp ──────────────────────────
 build_fast_path = BUILD_DIR / "build_fast.py"
