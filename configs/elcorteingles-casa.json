@@ -6,13 +6,7 @@
       "name": "El Corte Inglés (Casa)",
       "key": "elcorteingles_casa",
       "domain": "elcorteingles.pt"
-    },
-    {
-      "id": "b2172ee8-0472-43b2-9b0c-7b575a6061bb",
-      "name": "El Corte Inglés",
-      "key": "elcorteingles",
-      "domain": "elcorteingles.pt"
     }
   ],
-  "output_file": "elcorteingles-report.html"
+  "output_file": "elcorteingles-casa-report.html"
 }
