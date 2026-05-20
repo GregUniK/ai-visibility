@@ -12,7 +12,7 @@ GitHub secrets:
   AIPEEKABOO_API_KEY_ECI  — Analytics2 account (El Corte Inglés)
   AIPEEKABOO_API_KEY_LM   — Analytics1 account (Leroy Merlin)
 """
-import json, os, shutil, subprocess, sys, pathlib
+import json, os, shutil, subprocess, sys, pathlib, urllib.request, urllib.error
 
 ROOT      = pathlib.Path(__file__).parent.parent.parent   # repo root
 BUILD_DIR = ROOT / "build-tools"
@@ -31,9 +31,27 @@ API_KEYS = {
 if not API_KEYS["AIPEEKABOO_API_KEY"]:
     sys.exit("ERROR: AIPEEKABOO_API_KEY env var not set")
 
-# Debug: show first 20 chars of each key so we can verify secrets in CI logs
-for k, v in API_KEYS.items():
-    print(f"  {k}: {'[not set]' if not v else '...'+v[-6:]}")
+# Validate each API key by listing accessible brands (output is NOT masked by GitHub)
+print("\n── Key → Brand validation ──────────────────────────────────────────")
+for key_name, key_value in API_KEYS.items():
+    if not key_value:
+        print(f"  {key_name}: [not set]")
+        continue
+    try:
+        req = urllib.request.Request(
+            "https://www.aipeekaboo.com/api/v1/brands",
+            headers={"X-API-Key": key_value}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+            brands = data if isinstance(data, list) else data.get("brands", data.get("data", []))
+            names = [b.get("name", "?") for b in brands]
+            print(f"  {key_name}: {len(names)} brand(s) — {', '.join(names) or '(none)'}")
+    except urllib.error.HTTPError as e:
+        print(f"  {key_name}: HTTP {e.code} — {e.reason}")
+    except Exception as e:
+        print(f"  {key_name}: ERROR — {e}")
+print()
 
 # ── Patch upstream build_fast.py to support skip_nlp ──────────────────────────
 build_fast_path = BUILD_DIR / "build_fast.py"
