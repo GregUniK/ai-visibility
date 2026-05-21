@@ -714,6 +714,10 @@ function renderOverview(){
   /* ── Competitor bar items ───────────────────────────────────────────── */
   var compMax=top8[0]?(activeModel!=='all'?(top8[0].modelMentions||top8[0].mentions):top8[0].mentions):1;if(compMax===0)compMax=1;
   var compItems=top8.map(function(c){var cd=COMP_DOMAINS[c.name]||(c.name.toLowerCase().replace(/\s/g,'')+'.com');var mentionVal=activeModel!=='all'?(c.modelMentions||0):c.mentions;return {icon:cd,label:c.name,val:mentionVal,sub:mentionVal+' mentions'};});
+  var brandMentionCount=inRangeDates.reduce(function(s,d){return s+(dayBrandHits[d]||0);},0);
+  var _brandDomOv=BRAND_CFG[currentBrand].url||'aipeekaboo.com';
+  var _brandPctOv=compMax>0?Math.round(brandMentionCount/compMax*100):0;
+  var _brandOvRow='<div class="ov-bar-row" style="background:rgba(79,70,229,.06);padding:6px 0;border-top:1.5px dashed rgba(79,70,229,.3);border-bottom:none"><div class="ov-bar-lbl" style="color:#4f46e5;font-weight:700"><img src="'+fav(_brandDomOv)+'" onerror="this.style.opacity=\'0\'" alt=""><span>You ('+brandName+')</span></div><div class="ov-bar-track"><div class="ov-bar-fill" style="width:'+_brandPctOv+'%;background:rgba(79,70,229,.85)"></div></div><div class="ov-bar-val" style="color:#4f46e5;font-weight:700">'+brandMentionCount+' mentions</div></div>';
 
   /* ── Top domain items ───────────────────────────────────────────────── */
   var topDom=activeCit.topDomains.slice(0,8),domMax=topDom[0]?topDom[0].count:1;
@@ -724,7 +728,7 @@ function renderOverview(){
   document.getElementById('ovContent').innerHTML=
     '<div class="two-col" style="margin-bottom:14px">'+
       '<div class="cc"><div class="cc-head"><div class="cc-title">Visibility Over Time</div><div class="cc-sub">'+visSubtitle+'</div></div><div class="cc-body" style="height:260px;position:relative"><canvas id="ov-vis"></canvas></div><div id="ov-vis-legend" style="display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 14px 4px;border-top:1px solid var(--border)"></div></div>'+
-      '<div class="cc"><div class="cc-head"><div class="cc-title">Competitor Mentions</div><div class="cc-sub">'+(activeModel!=='all'?(MODEL_META[activeModel]||{label:activeModel}).label+' &middot; ':'')+'top 8 by mention count</div></div><div class="cc-body"><div class="ov-bar-wrap">'+ovBars(compItems,compMax,'ov-green')+'</div></div></div>'+
+      '<div class="cc"><div class="cc-head"><div class="cc-title">Competitor Mentions</div><div class="cc-sub">'+(activeModel!=='all'?(MODEL_META[activeModel]||{label:activeModel}).label+' &middot; ':'')+'top 8 by mention count</div></div><div class="cc-body"><div class="ov-bar-wrap">'+ovBars(compItems,compMax,'ov-green')+_brandOvRow+'</div></div></div>'+
     '</div>'+
     '<div class="two-col" style="margin-bottom:14px">'+
       '<div class="cc"><div class="cc-head"><div class="cc-title">Sentiment Breakdown</div><div class="cc-sub">'+sMentions.length+' brand mention'+(sMentions.length!==1?'s':'')+' analysed</div></div><div class="cc-body" style="height:210px;position:relative"><canvas id="ov-sent"></canvas></div></div>'+
@@ -1185,7 +1189,15 @@ function renderCompetitors(){
   function _dc(c){return activeModel==='all'?c.mentions:(c.modelMentions&&c.modelMentions[activeModel]||0);}
   if(activeModel!=='all')comps=comps.slice().sort(function(a,b){return _dc(b)-_dc(a);});
   var max=comps[0]?_dc(comps[0]):1;if(max===0)max=1;
-  document.getElementById('compList').innerHTML=comps.slice(0,15).map(function(c,i){
+  var _cpd=D.prompts[bk];
+  var _brandMentionsComp=activeModel==='all'?_cpd.reduce(function(s,p){return s+(p.mentions||0);},0):_cpd.reduce(function(s,p){return s+((p.models&&p.models[activeModel]&&p.models[activeModel].mentioned)?1:0);},0);
+  var _bMentionedPd=_cpd.filter(function(p){return activeModel==='all'?p.mentions>0:(p.models&&p.models[activeModel]&&p.models[activeModel].mentioned);});
+  var _brandAvgComp=_bMentionedPd.length?Math.round(_bMentionedPd.reduce(function(s,p){return s+(activeModel==='all'?(p.avgScore||0):((p.models[activeModel]&&p.models[activeModel].score)||0));},0)/_bMentionedPd.length):0;
+  var _brandPctComp=max>0?(_brandMentionsComp/max*100).toFixed(0):0;
+  var _brandDomComp=BRAND_CFG[currentBrand].url||'aipeekaboo.com';
+  var _brandCompName=BRAND_CFG[currentBrand].name;
+  var _brandCompRow='<div class="comp-row" style="background:rgba(79,70,229,.06);border-bottom:1.5px dashed rgba(79,70,229,.25)"><div class="comp-rank" style="color:#4f46e5;font-size:9px;font-weight:800;letter-spacing:.05em;width:20px">YOU</div><img class="comp-fav" src="'+fav(_brandDomComp)+'" onerror="this.style.display=\'none\'"><div class="comp-name" style="color:#4f46e5;font-weight:700">'+esc(_brandCompName)+'</div><div class="comp-bar-wrap"><div class="comp-bar" style="width:'+_brandPctComp+'%;background:rgba(79,70,229,.85)"></div></div><div class="comp-count" style="color:#4f46e5;font-weight:600">'+_brandMentionsComp+' mentions</div><div class="comp-score" style="color:#4f46e5">avg '+_brandAvgComp+'</div><div class="sdot sdot-pos" title="positive"></div></div>';
+  document.getElementById('compList').innerHTML=_brandCompRow+comps.slice(0,15).map(function(c,i){
     var cd=COMP_DOMAINS[c.name]||(c.name.toLowerCase().replace(/\s/g,'')+'.com');
     var dispVal=_dc(c);
     var pct=(dispVal/max*100).toFixed(0);
@@ -1306,6 +1318,31 @@ function _getCompCits(bk){if(!_compCitsCache[bk])_compCitsCache[bk]=_buildCompCi
 function toggleCitDd(){var m=document.getElementById('citCompMenu');if(m)m.classList.toggle('open');}
 document.addEventListener('click',function(e){var dd=document.getElementById('citCompDd');if(dd&&!dd.contains(e.target)){var m=document.getElementById('citCompMenu');if(m)m.classList.remove('open');}});
 function setCitComp(name,btn){activeCitComp=name;renderCitations();}
+function _buildBrandCits(bk){
+  var rh=RAW_HISTORY[bk];if(!rh)return[];
+  var runDates=rh.runDates||[];var maxDate=runDates.length?runDates[runDates.length-1]:null;
+  var cutoff=null,endDate=null,lastRunOnly=false;
+  if(currentTimeRange==='last-run'){lastRunOnly=true;}
+  else if(currentTimeRange==='last-7'&&maxDate){cutoff=_daysBack(maxDate,7);}
+  else if(currentTimeRange==='last-14'&&maxDate){cutoff=_daysBack(maxDate,14);}
+  else if(currentTimeRange==='last-20'&&maxDate){cutoff=_daysBack(maxDate,20);}
+  else if(currentTimeRange==='custom'&&customStartDate&&customEndDate){cutoff=customStartDate;endDate=customEndDate;}
+  function inRange(d){if(!d)return true;if(lastRunOnly)return d===maxDate;if(endDate)return d>=cutoff&&d<=endDate;if(cutoff)return d>=cutoff;return true;}
+  var urlMap={};
+  (rh.prompts||[]).forEach(function(rp){
+    (rp.entries||[]).forEach(function(e){
+      if(!e.hit||!e.srcs||!e.srcs.length)return;
+      if(!inRange(e.date))return;
+      if(activeModel!=='all'&&e.model!==activeModel)return;
+      e.srcs.forEach(function(s){
+        var key=s.u;
+        if(urlMap[key]){urlMap[key].count++;if(e.model&&urlMap[key].models.indexOf(e.model)===-1)urlMap[key].models.push(e.model);}
+        else urlMap[key]={url:s.u,title:s.t||s.u,domain:(s.u.match(/https?:\/\/([^\/]+)/)||[])[1]||'',count:1,models:e.model?[e.model]:[],pageType:s.pt,contentType:s.ct};
+      });
+    });
+  });
+  return Object.values(urlMap).sort(function(a,b){return b.count-a.count;});
+}
 function _barRows(items,total){return items.map(function(x){var pct=total>0?(x.count/total*100).toFixed(1):0;var lbl=x.type.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});return '<div class="bar-row"><div class="bar-label">'+lbl+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="bar-val">'+x.count+'</div></div>';}).join('');}
 function renderCitations(){
   var bk=BRAND_CFG[currentBrand].key,c;
@@ -1315,22 +1352,27 @@ function renderCitations(){
     c.uniqueDomains=c.topDomains?c.topDomains.length:D.citations[bk].uniqueDomains;
     c.topListicles=D.citations[bk].topListicles;
   } else c=D.citations[bk];
-  /* competitor filter setup */
+  /* competitor/brand filter setup */
   var compCits=_getCompCits(currentBrand);
-  var useCompFilter=activeCitComp!=='all'&&(compCits[activeCitComp]||compCits['__norm__'+_normComp(activeCitComp)]);
+  var _brandCitsArr=_buildBrandCits(currentBrand);
+  var useBrandFilter=activeCitComp==='__brand__';
+  var useCompFilter=!useBrandFilter&&activeCitComp!=='all'&&(compCits[activeCitComp]||compCits['__norm__'+_normComp(activeCitComp)]);
   var chevDdSvg='<svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px;flex-shrink:0"><path d="M1 1l4 4 4-4"/></svg>';
   var allComps=_dedupeComps((D.competitors[bk]||[]).filter(function(cp){return!cp.isBrand;})).slice(0,15);
-  var activeCd=activeCitComp==='all'?null:(COMP_DOMAINS&&COMP_DOMAINS[activeCitComp])||(activeCitComp.toLowerCase().replace(/\s+/g,'')+'.com');
-  var triggerContent=(activeCd?'<img src="'+fav(activeCd)+'" onerror="this.style.display=\'none\'">':'')+'<span>'+(activeCitComp==='all'?'All Citations':activeCitComp)+'</span>'+chevDdSvg;
+  var _citBrandName=BRAND_CFG[currentBrand].name;
+  var _citBrandDom=BRAND_CFG[currentBrand].url||'aipeekaboo.com';
+  var activeCd=activeCitComp==='all'?null:useBrandFilter?_citBrandDom:((COMP_DOMAINS&&COMP_DOMAINS[activeCitComp])||(activeCitComp.toLowerCase().replace(/\s+/g,'')+'.com'));
+  var triggerContent=(activeCd?'<img src="'+fav(activeCd)+'" onerror="this.style.display=\'none\'">':'')+'<span>'+(activeCitComp==='all'?'All Citations':useBrandFilter?'You ('+_citBrandName+')':activeCitComp)+'</span>'+chevDdSvg;
   var ddOpts='<div class="cit-comp-opt'+(activeCitComp==='all'?' active':'')+'" onclick="setCitComp(\'all\',this)">All Citations</div>';
+  ddOpts+='<div class="cit-comp-opt'+(useBrandFilter?' active':'')+'" style="border-bottom:1px solid var(--border);background:'+(useBrandFilter?'var(--surface2)':'rgba(79,70,229,.04)')+'" onclick="setCitComp(\'__brand__\',this)"><img src="'+fav(_citBrandDom)+'" onerror="this.style.display=\'none\'"><span style="color:#4f46e5;font-weight:'+(useBrandFilter?'700':'500')+'">You ('+_citBrandName+')</span></div>';
   ddOpts+=allComps.map(function(comp){
     var isActive=activeCitComp===comp.name;
     var cd=(COMP_DOMAINS&&COMP_DOMAINS[comp.name])||(comp.name.toLowerCase().replace(/\s+/g,'')+'.com');
     return '<div class="cit-comp-opt'+(isActive?' active':'')+'" onclick="setCitComp(\''+comp.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\',this)"><img src="'+fav(cd)+'" onerror="this.style.display=\'none\'">'+comp.name+'</div>';
   }).join('');
   var filterBar='<div class="cit-comp-bar"><span class="cit-comp-label">Filter by competitor</span><div class="cit-comp-dd" id="citCompDd"><button class="cit-comp-trigger" onclick="toggleCitDd()">'+triggerContent+'</button><div class="cit-comp-menu" id="citCompMenu">'+ddOpts+'</div></div></div>';
-  /* compute domain/content type bars, possibly filtered by competitor */
-  var compUrls=useCompFilter?(compCits[activeCitComp]||compCits['__norm__'+_normComp(activeCitComp)]):null;
+  /* compute domain/content type bars, possibly filtered by brand or competitor */
+  var compUrls=useCompFilter?(compCits[activeCitComp]||compCits['__norm__'+_normComp(activeCitComp)]):useBrandFilter?_brandCitsArr:null;
   var domainCounts={},contentCounts={},typeCounts={};
   if(useCompFilter&&compUrls){
     compUrls.forEach(function(cu){
@@ -1364,10 +1406,10 @@ function renderCitations(){
     document.getElementById('citContent').innerHTML=
       filterBar+
       '<div class="two-col">'+
-        '<div class="cc"><div class="cc-head"><div class="cc-title">Page Type</div><div class="cc-sub">'+totalComp.toLocaleString()+' citations with '+activeCitComp+'</div></div><div class="cc-body">'+dtBars+'</div></div>'+
-        '<div class="cc"><div class="cc-head"><div class="cc-title">Content Type</div><div class="cc-sub">when '+activeCitComp+' is mentioned</div></div><div class="cc-body">'+ctBars+'</div></div>'+
+        '<div class="cc"><div class="cc-head"><div class="cc-title">Page Type</div><div class="cc-sub">'+totalComp.toLocaleString()+' citations with '+(useBrandFilter?'You ('+_citBrandName+')':activeCitComp)+'</div></div><div class="cc-body">'+dtBars+'</div></div>'+
+        '<div class="cc"><div class="cc-head"><div class="cc-title">Content Type</div><div class="cc-sub">when '+(useBrandFilter?'You ('+_citBrandName+')':activeCitComp)+' is mentioned</div></div><div class="cc-body">'+ctBars+'</div></div>'+
       '</div>'+
-      '<div class="cc"><div class="cc-head"><div class="cc-title">Top Cited Domains</div><div class="cc-sub">co-occurring with '+activeCitComp+' mentions</div></div>'+
+      '<div class="cc"><div class="cc-head"><div class="cc-title">Top Cited Domains</div><div class="cc-sub">co-occurring with '+(useBrandFilter?'You ('+_citBrandName+')':activeCitComp)+' mentions</div></div>'+
         '<div class="cc-body np"><table class="dom-table"><thead><tr><th>#</th><th>Domain</th><th>Domain Type</th><th style="text-align:right">Citations</th></tr></thead><tbody>'+domRows+'</tbody></table></div>'+
       '</div>';
     return;
