@@ -63,6 +63,60 @@ NLP_NEW = '    llm_cfg = None if cfg.get("skip_nlp") else {\n        "provider":
 ACT_OLD = '        ACTIONS[brand_key] = generate_actions(cfg, brand_name, brand_domain, brand_data)'
 ACT_NEW = '        ACTIONS[brand_key] = [] if cfg.get("skip_nlp") else generate_actions(cfg, brand_name, brand_domain, brand_data)'
 
+# Patch A: offset-based pagination for /brands/:id/prompts.
+# Upstream uses `page` param which the API silently ignores, causing infinite loops
+# for any brand with >200 prompts (e.g. El Corte Inglés casa & sport, 250 each).
+PAGE_OLD = (
+    'def fetch_all_prompts(api_key, brand_id):\n'
+    '    """Fetch all prompts for a brand with pagination."""\n'
+    '    prompts = []\n'
+    '    page = 1\n'
+    '    while True:\n'
+    '        data = api_get(api_key, f"/brands/{brand_id}/prompts",\n'
+    '                       params={"limit": 200, "page": page})\n'
+    '        batch = data.get("prompts") or data.get("data") or []\n'
+    '        prompts.extend(batch)\n'
+    '        pagination = data.get("pagination", {})\n'
+    '        if not pagination.get("hasMore", False):\n'
+    '            break\n'
+    '        page += 1\n'
+    '    return prompts'
+)
+PAGE_NEW = (
+    'def fetch_all_prompts(api_key, brand_id):\n'
+    '    """Fetch all prompts for a brand with pagination (offset-based)."""\n'
+    '    prompts = []\n'
+    '    offset = 0\n'
+    '    limit = 200\n'
+    '    while True:\n'
+    '        data = api_get(api_key, f"/brands/{brand_id}/prompts",\n'
+    '                       params={"limit": limit, "offset": offset})\n'
+    '        batch = data.get("prompts") or data.get("data") or []\n'
+    '        if not batch:\n'
+    '            break\n'
+    '        prompts.extend(batch)\n'
+    '        pagination = data.get("pagination", {})\n'
+    '        print(f"    page offset={offset} got={len(batch)} total={pagination.get(\'total\',\'?\')} hasMore={pagination.get(\'hasMore\', False)}", flush=True)\n'
+    '        if not pagination.get("hasMore", False):\n'
+    '            break\n'
+    '        offset += limit\n'
+    '        if offset >= 10000:\n'
+    '            print(f"    WARNING: pagination safety break at offset={offset}", flush=True)\n'
+    '            break\n'
+    '    return prompts'
+)
+
+# Patch B: bump rate limit from 3.2s (20 req/min, old Grow plan) to 1.6s (40 req/min, upgraded plan).
+RATE_OLD = '_MIN_FETCH_INTERVAL = 3.2  # seconds between calls to stay under 20 req/min'
+RATE_NEW = '_MIN_FETCH_INTERVAL = 1.6  # seconds between calls to stay under 40 req/min (upgraded plan)'
+
+# Patch C: load config as UTF-8 explicitly.
+# On Windows runners (or any locale where the default isn't UTF-8), `open(path)` falls
+# back to cp1252 and mangles non-ASCII brand names (e.g. "Inglés" -> "InglÃ©s").
+# Linux CI runners default to UTF-8 so this is a safety patch.
+ENC_OLD = '    with open(path) as f:\n        cfg = json.load(f)'
+ENC_NEW = '    with open(path, encoding="utf-8") as f:\n        cfg = json.load(f)'
+
 patched = False
 if NLP_OLD in src:
     src = src.replace(NLP_OLD, NLP_NEW)
@@ -77,6 +131,27 @@ if ACT_OLD in src:
     print("Patched build_fast.py: skip_nlp (action generation)")
 else:
     print("WARNING: skip_nlp actions patch not applied — upstream may have changed")
+
+if PAGE_OLD in src:
+    src = src.replace(PAGE_OLD, PAGE_NEW)
+    patched = True
+    print("Patched build_fast.py: offset-based pagination (fixes infinite loop for >200 prompts)")
+else:
+    print("WARNING: pagination patch not applied — upstream may have changed")
+
+if RATE_OLD in src:
+    src = src.replace(RATE_OLD, RATE_NEW)
+    patched = True
+    print("Patched build_fast.py: rate limit 3.2s -> 1.6s (upgraded API plan)")
+else:
+    print("WARNING: rate limit patch not applied — upstream may have changed")
+
+if ENC_OLD in src:
+    src = src.replace(ENC_OLD, ENC_NEW)
+    patched = True
+    print("Patched build_fast.py: UTF-8 config encoding (fixes 'Inglés' mangling)")
+else:
+    print("WARNING: utf-8 config encoding patch not applied — upstream may have changed")
 
 if patched:
     build_fast_path.write_text(src, encoding="utf-8")
@@ -109,12 +184,19 @@ for slug in CLIENTS:
     tmp_cfg = TMP / f"config_{slug}.json"
     tmp_cfg.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
-    # Copy actions stub — prevents action generation entirely
+    # Copy actions stub — prevents action generation entirely.
+    # build_fast.py looks up actions by brand["key"] which may differ from the
+    # slug (e.g. slug="elcorteingles-casa" but key="elcorteingles_casa"). Copy
+    # under both names to cover every config shape.
     stub = STUBS / f"{slug}.json"
     if not stub.exists():
         print(f"  WARNING — no stub found at stubs/{slug}.json, creating empty one")
         stub.write_text("[]", encoding="utf-8")
     shutil.copy(stub, BUILD_DIR / f"actions_{slug}.json")
+    for brand in cfg.get("brands", []):
+        bk = brand.get("key")
+        if bk and bk != slug:
+            shutil.copy(stub, BUILD_DIR / f"actions_{bk}.json")
 
     result = subprocess.run(
         [sys.executable, str(BUILD_DIR / "build_fast.py"), "--config", str(tmp_cfg)],
