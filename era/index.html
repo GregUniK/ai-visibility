@@ -329,23 +329,6 @@ tr.dom-row-open .dom-chev{transform:rotate(180deg)}
       </div>
     </div>
   </div>
-  <span class="mb-label" style="margin-left:10px">Filter by intent</span>
-  <div class="flt-dd" id="intentDd">
-    <button class="flt-trigger" id="intentTrigger" onclick="toggleFltDd('intentDd','intentMenu','intentTrigger')">
-      <span class="flt-trigger-label" id="intentTriggerLabel">All intents</span>
-      <span class="flt-chev">&#9660;</span>
-    </button>
-    <div class="flt-menu" id="intentMenu">
-      <div class="flt-opt selected" onclick="pickIntent('all',this)">All intents</div>
-      <div class="flt-opt" onclick="pickIntent('COMMERCIAL',this)"><span class="flt-opt-dot" style="background:#7c3aed1a;border:1.5px solid #7c3aed"></span>Commercial</div>
-      <div class="flt-opt" onclick="pickIntent('TRANSACTIONAL',this)"><span class="flt-opt-dot" style="background:#16a34a1a;border:1.5px solid #16a34a"></span>Transactional</div>
-      <div class="flt-opt" onclick="pickIntent('INVESTIGATIONAL',this)"><span class="flt-opt-dot" style="background:#2563eb1a;border:1.5px solid #2563eb"></span>Investigational</div>
-      <div class="flt-opt" onclick="pickIntent('INFORMATIONAL',this)"><span class="flt-opt-dot" style="background:#0891b21a;border:1.5px solid #0891b2"></span>Informational</div>
-      <div class="flt-opt" onclick="pickIntent('NAVIGATIONAL',this)"><span class="flt-opt-dot" style="background:#64748b1a;border:1.5px solid #64748b"></span>Navigational</div>
-      <div class="flt-opt" onclick="pickIntent('BRANDED',this)"><span class="flt-opt-dot" style="background:#d974061a;border:1.5px solid #d97406"></span>Branded</div>
-      <div class="flt-opt" onclick="pickIntent('SENTIMENT',this)"><span class="flt-opt-dot" style="background:#db27771a;border:1.5px solid #db2777"></span>Sentiment</div>
-    </div>
-  </div>
 </div>
 <nav class="subnav">
   <div class="sn-inner">
@@ -372,6 +355,23 @@ tr.dom-row-open .dom-chev{transform:rotate(180deg)}
       <button class="fb-btn active" onclick="setPromptFilter('all',this)">All</button>
       <button class="fb-btn" onclick="setPromptFilter('mentioned',this)">Mentioned</button>
       <button class="fb-btn" onclick="setPromptFilter('not',this)">Not mentioned</button>
+      <span style="display:inline-block;width:1px;height:18px;background:var(--border);margin:0 8px;vertical-align:middle;flex-shrink:0"></span>
+      <div class="flt-dd" id="intentDd">
+        <button class="flt-trigger" id="intentTrigger" onclick="toggleFltDd('intentDd','intentMenu','intentTrigger')" style="min-width:120px">
+          <span class="flt-trigger-label" id="intentTriggerLabel">All intents</span>
+          <span class="flt-chev">&#9660;</span>
+        </button>
+        <div class="flt-menu" id="intentMenu">
+          <div class="flt-opt selected" onclick="pickIntent('all',this)">All intents</div>
+          <div class="flt-opt" onclick="pickIntent('COMMERCIAL',this)"><span class="flt-opt-dot" style="background:#7c3aed1a;border:1.5px solid #7c3aed"></span>Commercial</div>
+          <div class="flt-opt" onclick="pickIntent('TRANSACTIONAL',this)"><span class="flt-opt-dot" style="background:#16a34a1a;border:1.5px solid #16a34a"></span>Transactional</div>
+          <div class="flt-opt" onclick="pickIntent('INVESTIGATIONAL',this)"><span class="flt-opt-dot" style="background:#2563eb1a;border:1.5px solid #2563eb"></span>Investigational</div>
+          <div class="flt-opt" onclick="pickIntent('INFORMATIONAL',this)"><span class="flt-opt-dot" style="background:#0891b21a;border:1.5px solid #0891b2"></span>Informational</div>
+          <div class="flt-opt" onclick="pickIntent('NAVIGATIONAL',this)"><span class="flt-opt-dot" style="background:#64748b1a;border:1.5px solid #64748b"></span>Navigational</div>
+          <div class="flt-opt" onclick="pickIntent('BRANDED',this)"><span class="flt-opt-dot" style="background:#d974061a;border:1.5px solid #d97406"></span>Branded</div>
+          <div class="flt-opt" onclick="pickIntent('SENTIMENT',this)"><span class="flt-opt-dot" style="background:#db27771a;border:1.5px solid #db2777"></span>Sentiment</div>
+        </div>
+      </div>
     </div>
     <div class="cc-body np">
       <table class="ptable"><thead><tr>
@@ -709,7 +709,7 @@ function pickIntent(it,opt){
   var menu=document.getElementById('intentMenu');
   if(menu){menu.classList.remove('open');}
   _fltDdOpen=null;
-  applyPromptFilter();
+  applyPromptFilter();renderStats();
 }
 function switchTab(t,btn){document.querySelectorAll('.stab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));document.getElementById('panel-'+t).classList.add('active');}
 function renderAll(){renderStats();renderOverview();renderPrompts();renderSentiment();renderCompetitors();renderCitations();renderActionsGrid();}
@@ -885,7 +885,7 @@ function renderOverview(){
 }
 /* stats */
 function renderStats(){
-  var bk=BRAND_CFG[currentBrand].key,pd=D.prompts[bk],totalRuns=0,mentioned=0;
+  var bk=BRAND_CFG[currentBrand].key,pd=(intentFilter!=='all'?D.prompts[bk].filter(function(p){return String(p.intent||'').toUpperCase()===intentFilter;}):D.prompts[bk]),totalRuns=0,mentioned=0;
   pd.forEach(function(p){
     if(activeModel==='all'){totalRuns+=p.totalRuns;mentioned+=p.mentions;}
     else{var mr=p.models[activeModel];if(mr){totalRuns++;if(mr.mentioned)mentioned++;}}
@@ -916,10 +916,7 @@ function renderStats(){
   var c=D.citations[bk];
   var citTotal=activeModel!=='all'&&D.modelCitations&&D.modelCitations[bk]&&D.modelCitations[bk][activeModel]?D.modelCitations[bk][activeModel].total:c.total;
   /* sentiment score */
-  var s=D.sentiment[bk];
-  var sMentions=activeModel==='all'?s.mentions:s.mentions.filter(function(m){return m.model===activeModel;});
-  var sentPos=sMentions.filter(function(m){return m.sentiment==='positive';}).length;
-  var sentTotal=sMentions.length;
+  var sentPos=0,sentTotal=0;pd.forEach(function(p){if(activeModel==='all'){Object.values(p.models).forEach(function(m){if(m&&m.mentioned&&m.sentiment){sentTotal++;if(m.sentiment==='positive')sentPos++;}});}else{var mr=p.models[activeModel];if(mr&&mr.mentioned&&mr.sentiment){sentTotal++;if(mr.sentiment==='positive')sentPos++;}}});
   var sentPct=sentTotal>0?(sentPos/sentTotal*100).toFixed(0):null;
   var sentCls=sentPct===null?'bad':parseInt(sentPct)>=60?'good':parseInt(sentPct)>=30?'warn':'bad';
   /* avg position */
