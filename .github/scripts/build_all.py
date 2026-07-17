@@ -31,6 +31,28 @@ API_KEYS = {
 if not API_KEYS["AIPEEKABOO_API_KEY"]:
     sys.exit("ERROR: AIPEEKABOO_API_KEY env var not set")
 
+
+def diagnose(cfg, api_key):
+    """Ask the API directly why a client failed.
+
+    build_fast.py raises on a bare raise_for_status(), so the response body —
+    which carries PeekaBoo's real error code — never reaches the log. Only
+    called after a failure, so it costs nothing on the happy path.
+    """
+    for brand in cfg.get("brands", []):
+        bid, name = brand.get("id"), brand.get("name", "?")
+        url = f"https://www.aipeekaboo.com/api/v1/brands/{bid}/prompts?limit=1&offset=0"
+        try:
+            req = urllib.request.Request(url, headers={"X-API-Key": api_key})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                print(f"  probe {name}: HTTP {resp.status} — prompts endpoint OK "
+                      f"(failure is downstream of the API)")
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace").strip()[:400]
+            print(f"  probe {name} [{bid}]: HTTP {e.code} — {body}")
+        except Exception as e:
+            print(f"  probe {name} [{bid}]: {type(e).__name__} — {e}")
+
 # Validate each API key by listing accessible brands (output is NOT masked by GitHub)
 print("\n── Key → Brand validation ──────────────────────────────────────────")
 for key_name, key_value in API_KEYS.items():
@@ -218,6 +240,7 @@ for slug in CLIENTS:
 
     if result.returncode != 0:
         print(f"  FAILED: {slug}")
+        diagnose(cfg, api_key)
         failed.append(slug)
         continue
 
