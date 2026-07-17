@@ -13,7 +13,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ⚠️ failing — brand id 404s |
 | El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ⚠️ failing — brand id 404s |
 | ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ | ✅ auto |
-| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⚠️ failing — `_LM` key returns 403 |
+| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⏸ paused — Analytics1 account deleted |
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
 | UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
 | Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from PeekaBoo |
@@ -112,17 +112,26 @@ Three PeekaBoo accounts are in use. Secrets are stored in:
 |---|---|---|
 | `AIPEEKABOO_API_KEY` | analytics@unik-seo.com (main) | coinsbee*, credibom, era, reduniq, unikseo, visitmadeira*, wizink-pt, wizink-es, xtb |
 | `AIPEEKABOO_API_KEY_ECI` | Analytics2 | elcorteingles-casa, elcorteingles-sport |
-| `AIPEEKABOO_API_KEY_LM` | Analytics1 | leroymerlin |
+| `AIPEEKABOO_API_KEY_LM` | Analytics1 — **account deleted 2026-07** | leroymerlin* |
 
-\* paused — brand no longer exists in the account.
+\* paused — see the status table at the top.
 
-`build_all.py` prints what each key can see at the start of every run — check that block first when a client starts failing:
+`build_all.py` prints every brand each key can actually see, with ids, at the start of
+every run. Read that block first when a client starts failing:
 ```
-AIPEEKABOO_API_KEY:     16 brand(s) — Credibom, XTB.com, ERA Imobiliária, ...
-AIPEEKABOO_API_KEY_ECI:  2 brand(s) — El Corte Inglés (Casa), El Corte Inglés
-AIPEEKABOO_API_KEY_LM:   HTTP 403 — Forbidden
+AIPEEKABOO_API_KEY_ECI: 2 brand(s)
+    8fd9c9fe-20d3-4e7c-a8bb-9523ff1308fb  El Corte Inglés (Casa)
+    b2172ee8-0472-43b2-9b0c-7b575a6061bb  El Corte Inglés
+AIPEEKABOO_API_KEY_LM: HTTP 403 — Forbidden
 ```
-A `403` means the key or its subscription is dead. A key that lists brands fine but 404s on a build means the **brand id in the config is stale** — the brand was recreated with a new id.
+Triage:
+- **`HTTP 403` on a key** → key or its subscription/account is dead. Account-side fix.
+- **Brand absent from the list** → deleted from PeekaBoo. Pause the client.
+- **Brand listed, but the build 404s on it** → the id in the config doesn't match the
+  id printed here. Copy the printed id into the config.
+
+A brand's id is also visible in its share link: open the share URL and the `brandId`
+is in the page source (`GET /brands` with the key is the more direct route).
 
 To find brand UUIDs: open the brand in the PeekaBoo dashboard — the UUID is in the URL. Or call `GET https://www.aipeekaboo.com/api/v1/brands` with `X-API-Key: pk_...`
 

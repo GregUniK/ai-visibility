@@ -1,4 +1,6 @@
 {
+  "paused": true,
+  "paused_reason": "Analytics1 PeekaBoo account deleted (confirmed with Greg 2026-07-17); AIPEEKABOO_API_KEY_LM returns HTTP 403. Report stays published with data frozen at its last successful build. Un-pause by restoring the account, re-adding the AIPEEKABOO_API_KEY_LM secret and updating the id below.",
   "api_key_env": "AIPEEKABOO_API_KEY_LM",
   "brands": [
     {

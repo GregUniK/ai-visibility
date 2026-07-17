@@ -45,8 +45,11 @@ for key_name, key_value in API_KEYS.items():
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
             brands = data if isinstance(data, list) else data.get("brands", data.get("data", []))
-            names = [b.get("name", "?") for b in brands]
-            print(f"  {key_name}: {len(names)} brand(s) — {', '.join(names) or '(none)'}")
+            print(f"  {key_name}: {len(brands)} brand(s)")
+            # Print ids, not just names: a client that 404s while its name shows
+            # up here means the id in its config doesn't match the real brand.
+            for b in brands:
+                print(f"      {b.get('id', '?')}  {b.get('name', '?')}")
     except urllib.error.HTTPError as e:
         print(f"  {key_name}: HTTP {e.code} — {e.reason}")
     except Exception as e:
