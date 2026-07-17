@@ -10,8 +10,8 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 |---|---|---|
 | CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from PeekaBoo |
 | Credibom | https://gregunik.github.io/ai-visibility/credibom/ | ✅ auto |
-| El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ⚠️ failing — brand id 404s |
-| El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ⚠️ failing — brand id 404s |
+| El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ✅ auto |
+| El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ✅ auto |
 | ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ | ✅ auto |
 | Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⏸ paused — Analytics1 account deleted |
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
@@ -21,7 +21,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | WiZink (España) | https://gregunik.github.io/ai-visibility/wizink-es/ | ✅ auto |
 | XTB | https://gregunik.github.io/ai-visibility/xtb/ | ✅ auto |
 
-Status as of 2026-07-17. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
+Status as of 2026-07-17 — all 9 active clients building green. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
 
 ---
 
@@ -127,8 +127,18 @@ AIPEEKABOO_API_KEY_LM: HTTP 403 — Forbidden
 Triage:
 - **`HTTP 403` on a key** → key or its subscription/account is dead. Account-side fix.
 - **Brand absent from the list** → deleted from PeekaBoo. Pause the client.
-- **Brand listed, but the build 404s on it** → the id in the config doesn't match the
-  id printed here. Copy the printed id into the config.
+- **Brand listed with the same id as the config, but the build still 404s on it** →
+  the build used the *wrong key*, not a bad id. On a failure, build_all.py's
+  `diagnose()` re-hits `/prompts` with the resolved key: if that probe returns 200
+  while the build 404'd, the build sent a different key. See the note below.
+
+> **Non-main accounts and the `AIPEEKABOO_API_KEY` override.** build_fast.py's
+> `load_config()` overrides the config's api key with the `AIPEEKABOO_API_KEY` env var
+> whenever it is set. build_all.py works around this by setting that env var, per
+> subprocess, to each client's resolved key. If a non-main client (ECI, or a future
+> `_LM`) suddenly 404s across the board after an upstream template change, check that
+> this per-client env override in build_all.py is still in place — losing it makes
+> every client build with the main key, so only non-main accounts break.
 
 A brand's id is also visible in its share link: open the share URL and the `brandId`
 is in the page source (`GET /brands` with the key is the more direct route).
