@@ -39,19 +39,28 @@ def diagnose(cfg, api_key):
     which carries PeekaBoo's real error code — never reaches the log. Only
     called after a failure, so it costs nothing on the happy path.
     """
+    # Test limit=1 vs limit=200 (the build's value). If 1 succeeds and 200
+    # fails, the account caps the page size; if both behave the same, the
+    # build-time failure was transient (rate/quota mid-run).
     for brand in cfg.get("brands", []):
         bid, name = brand.get("id"), brand.get("name", "?")
-        url = f"https://www.aipeekaboo.com/api/v1/brands/{bid}/prompts?limit=1&offset=0"
-        try:
-            req = urllib.request.Request(url, headers={"X-API-Key": api_key})
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                print(f"  probe {name}: HTTP {resp.status} — prompts endpoint OK "
-                      f"(failure is downstream of the API)")
-        except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="replace").strip()[:400]
-            print(f"  probe {name} [{bid}]: HTTP {e.code} — {body}")
-        except Exception as e:
-            print(f"  probe {name} [{bid}]: {type(e).__name__} — {e}")
+        for limit in (1, 200):
+            url = (f"https://www.aipeekaboo.com/api/v1/brands/{bid}/prompts"
+                   f"?limit={limit}&offset=0")
+            try:
+                req = urllib.request.Request(url, headers={"X-API-Key": api_key})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    data = json.loads(resp.read().decode())
+                    d = data.get("data", data)
+                    total = (d.get("pagination", {}) or {}).get("total", "?") \
+                        if isinstance(d, dict) else "?"
+                    print(f"  probe {name} limit={limit}: HTTP {resp.status} OK "
+                          f"(total prompts={total})")
+            except urllib.error.HTTPError as e:
+                body = e.read().decode(errors="replace").strip()[:300]
+                print(f"  probe {name} [{bid}] limit={limit}: HTTP {e.code} — {body}")
+            except Exception as e:
+                print(f"  probe {name} [{bid}] limit={limit}: {type(e).__name__} — {e}")
 
 # Validate each API key by listing accessible brands (output is NOT masked by GitHub)
 print("\n── Key → Brand validation ──────────────────────────────────────────")
