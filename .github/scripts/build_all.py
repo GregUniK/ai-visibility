@@ -33,34 +33,28 @@ if not API_KEYS["AIPEEKABOO_API_KEY"]:
 
 
 def diagnose(cfg, api_key):
-    """Ask the API directly why a client failed.
+    """Ask the API directly why a client failed, using the key we resolved.
 
     build_fast.py raises on a bare raise_for_status(), so the response body —
-    which carries PeekaBoo's real error code — never reaches the log. Only
-    called after a failure, so it costs nothing on the happy path.
+    which carries PeekaBoo's real error code — never reaches the log; all the
+    build shows is "404 Client Error". Re-run the first prompts call here with
+    the resolved key and print the actual body. Only runs after a failure, so
+    it costs nothing on the happy path. A 200 here while the build 404s means
+    the build used a different key than this one (see the env note below).
     """
-    # Test limit=1 vs limit=200 (the build's value). If 1 succeeds and 200
-    # fails, the account caps the page size; if both behave the same, the
-    # build-time failure was transient (rate/quota mid-run).
     for brand in cfg.get("brands", []):
         bid, name = brand.get("id"), brand.get("name", "?")
-        for limit in (1, 200):
-            url = (f"https://www.aipeekaboo.com/api/v1/brands/{bid}/prompts"
-                   f"?limit={limit}&offset=0")
-            try:
-                req = urllib.request.Request(url, headers={"X-API-Key": api_key})
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    data = json.loads(resp.read().decode())
-                    d = data.get("data", data)
-                    total = (d.get("pagination", {}) or {}).get("total", "?") \
-                        if isinstance(d, dict) else "?"
-                    print(f"  probe {name} limit={limit}: HTTP {resp.status} OK "
-                          f"(total prompts={total})")
-            except urllib.error.HTTPError as e:
-                body = e.read().decode(errors="replace").strip()[:300]
-                print(f"  probe {name} [{bid}] limit={limit}: HTTP {e.code} — {body}")
-            except Exception as e:
-                print(f"  probe {name} [{bid}] limit={limit}: {type(e).__name__} — {e}")
+        url = f"https://www.aipeekaboo.com/api/v1/brands/{bid}/prompts?limit=200&offset=0"
+        try:
+            req = urllib.request.Request(url, headers={"X-API-Key": api_key})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                print(f"  probe {name} [{bid}]: HTTP {resp.status} OK with the "
+                      f"resolved key — build must have used a different key")
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace").strip()[:300]
+            print(f"  probe {name} [{bid}]: HTTP {e.code} — {body}")
+        except Exception as e:
+            print(f"  probe {name} [{bid}]: {type(e).__name__} — {e}")
 
 # Validate each API key by listing accessible brands (output is NOT masked by GitHub)
 print("\n── Key → Brand validation ──────────────────────────────────────────")
@@ -241,10 +235,20 @@ for slug in CLIENTS:
         if bk and bk != slug:
             shutil.copy(stub, BUILD_DIR / f"actions_{bk}.json")
 
+    # build_fast.py's load_config() overrides cfg["aipeekaboo_api_key"] with the
+    # AIPEEKABOO_API_KEY env var whenever it is set — and in CI it always is (the
+    # main key). That silently makes every client use the main key regardless of
+    # api_key_env, so non-main brands (El Corte Inglés on Analytics2) 404 with
+    # "Brand not found". Point that env var at THIS client's resolved key so the
+    # upstream override picks the right account instead of clobbering it.
+    sub_env = dict(os.environ)
+    sub_env["AIPEEKABOO_API_KEY"] = api_key
+
     result = subprocess.run(
         [sys.executable, str(BUILD_DIR / "build_fast.py"), "--config", str(tmp_cfg)],
         cwd=str(BUILD_DIR),
-        capture_output=False
+        capture_output=False,
+        env=sub_env
     )
 
     if result.returncode != 0:
