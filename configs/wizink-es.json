@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "5f3e19df-6ed0-4fe7-a8d5-475a5b5bcf78",
+      "name": "WiZink (España)",
+      "key": "wizink-es",
+      "domain": "wizink.es"
+    }
+  ],
+  "output_file": "wizink-es-report.html"
+}

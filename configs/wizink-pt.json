@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "296a958a-3a03-4322-ab00-275bc75e60af",
+      "name": "WiZink (Portugal)",
+      "key": "wizink-pt",
+      "domain": "wizink.pt"
+    }
+  ],
+  "output_file": "wizink-pt-report.html"
+}

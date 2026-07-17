@@ -1,4 +1,6 @@
 {
+  "paused": true,
+  "paused_reason": "Brand deleted from PeekaBoo (API 404, confirmed 2026-07-17; last successful build 2026-07-02). Report stays published with data frozen at that date. Un-pause by restoring the brand in PeekaBoo and updating the id below.",
   "brands": [
     {
       "id": "67a5ba8a-6c08-4d3f-85b9-640b2559db1b",

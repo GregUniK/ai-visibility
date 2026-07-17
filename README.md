@@ -4,17 +4,24 @@ Auto-refreshed PeekaBoo AI visibility reports published to GitHub Pages.
 
 **Live reports:** `https://gregunik.github.io/ai-visibility/<client>/`
 
-| Client | URL |
-|---|---|
-| CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ |
-| Credibom | https://gregunik.github.io/ai-visibility/credibom/ |
-| El Corte Inglés | https://gregunik.github.io/ai-visibility/elcorteingles/ |
-| ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ |
-| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ |
-| REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ |
-| UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ |
-| Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ |
-| XTB | https://gregunik.github.io/ai-visibility/xtb/ |
+Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
+
+| Client | URL | Refresh status |
+|---|---|---|
+| CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from PeekaBoo |
+| Credibom | https://gregunik.github.io/ai-visibility/credibom/ | ✅ auto |
+| El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ⚠️ failing — brand id 404s |
+| El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ⚠️ failing — brand id 404s |
+| ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ | ✅ auto |
+| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⚠️ failing — `_LM` key returns 403 |
+| REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
+| UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
+| Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from PeekaBoo |
+| WiZink (Portugal) | https://gregunik.github.io/ai-visibility/wizink-pt/ | ✅ auto |
+| WiZink (España) | https://gregunik.github.io/ai-visibility/wizink-es/ | ✅ auto |
+| XTB | https://gregunik.github.io/ai-visibility/xtb/ | ✅ auto |
+
+Status as of 2026-07-17. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
 
 ---
 
@@ -66,6 +73,22 @@ Delete `configs/<slug>.json`, commit and push. The next run skips that client. T
 
 ---
 
+## Pause a client (keep the report, stop building it)
+
+Add `"paused": true` and a `"paused_reason"` to `configs/<slug>.json`:
+```json
+{
+  "paused": true,
+  "paused_reason": "Brand deleted from PeekaBoo (API 404, confirmed 2026-07-17).",
+  "brands": [ ... ]
+}
+```
+The client is skipped at build time and **does not count as a failure**, so the run stays green. The published `<slug>/index.html` is left untouched and keeps serving its last good data.
+
+Use this when a brand disappears from PeekaBoo but the report should stay online. Without it, the client fails on every run and the red build stops meaning anything.
+
+---
+
 ## Add a brand to an existing report (multi-brand)
 
 Add another object to the `brands` array in the config. Example — El Corte Inglés has two brands (Casa + Sports) in one report:
@@ -87,9 +110,19 @@ Three PeekaBoo accounts are in use. Secrets are stored in:
 
 | Secret name | Account | Used by |
 |---|---|---|
-| `AIPEEKABOO_API_KEY` | analytics@unik-seo.com (main) | coinsbee, credibom, era, reduniq, unikseo, visitmadeira, xtb |
-| `AIPEEKABOO_API_KEY_ECI` | Analytics2 | elcorteingles |
+| `AIPEEKABOO_API_KEY` | analytics@unik-seo.com (main) | coinsbee*, credibom, era, reduniq, unikseo, visitmadeira*, wizink-pt, wizink-es, xtb |
+| `AIPEEKABOO_API_KEY_ECI` | Analytics2 | elcorteingles-casa, elcorteingles-sport |
 | `AIPEEKABOO_API_KEY_LM` | Analytics1 | leroymerlin |
+
+\* paused — brand no longer exists in the account.
+
+`build_all.py` prints what each key can see at the start of every run — check that block first when a client starts failing:
+```
+AIPEEKABOO_API_KEY:     16 brand(s) — Credibom, XTB.com, ERA Imobiliária, ...
+AIPEEKABOO_API_KEY_ECI:  2 brand(s) — El Corte Inglés (Casa), El Corte Inglés
+AIPEEKABOO_API_KEY_LM:   HTTP 403 — Forbidden
+```
+A `403` means the key or its subscription is dead. A key that lists brands fine but 404s on a build means the **brand id in the config is stale** — the brand was recreated with a new id.
 
 To find brand UUIDs: open the brand in the PeekaBoo dashboard — the UUID is in the URL. Or call `GET https://www.aipeekaboo.com/api/v1/brands` with `X-API-Key: pk_...`
 

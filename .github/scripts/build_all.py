@@ -162,12 +162,21 @@ print(f"\nDiscovered {len(CLIENTS)} clients: {', '.join(CLIENTS)}")
 
 succeeded = []
 failed    = []
+paused    = []
 
 for slug in CLIENTS:
     print(f"\n{'='*40}\n{slug}\n{'='*40}")
 
     cfg_path = CONFIGS / f"{slug}.json"
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+
+    # Paused clients are intentionally not built (e.g. brand removed from
+    # PeekaBoo) but their existing report stays published. Not a failure —
+    # otherwise every run would go red forever and the signal would be lost.
+    if cfg.get("paused"):
+        print(f"  PAUSED — {cfg.get('paused_reason', 'no reason given')}")
+        paused.append(slug)
+        continue
 
     # Resolve API key for this client
     key_env = cfg.get("api_key_env", "AIPEEKABOO_API_KEY")
@@ -241,14 +250,17 @@ for slug in CLIENTS:
     succeeded.append(slug)
 
 # ── Summary ───────────────────────────────────────────────────────────────────
+expected = len(CLIENTS) - len(paused)
 print(f"\n{'='*40}")
-print(f"Built:  {len(succeeded)}/{len(CLIENTS)} — {', '.join(succeeded) or 'none'}")
+print(f"Built:  {len(succeeded)}/{expected} — {', '.join(succeeded) or 'none'}")
+if paused:
+    print(f"Paused: {', '.join(paused)} (not built by design)")
 if failed:
     print(f"Failed: {', '.join(failed)}")
 
-# Exit 0 if at least some clients succeeded so the commit step always runs.
-# Exit 1 only if EVERYTHING failed (nothing to commit).
-if succeeded:
-    sys.exit(0)
-else:
-    sys.exit(1)
+# Exit non-zero if ANY non-paused client failed, so the run goes red and the
+# "Notify on failure" step opens an issue. The commit step runs regardless
+# (if: !cancelled() in refresh.yml), so reports that did build still ship.
+if failed:
+    sys.exit(f"\nERROR: {len(failed)} client(s) failed to build: {', '.join(failed)}")
+sys.exit(0)
