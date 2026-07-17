@@ -20,6 +20,9 @@
   .card-domain{font-size:.78rem;color:#64748b}
   .arrow{color:#334155;font-size:1rem;flex-shrink:0}
   .card:hover .arrow{color:#3b82f6}
+  .card.paused{opacity:.5}
+  .card.paused:hover{opacity:.85;border-color:#5b4a1f;background:#1c1a14}
+  .badge{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#fbbf24;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.28);padding:3px 9px;border-radius:999px;flex-shrink:0;white-space:nowrap}
   .footer{font-size:.72rem;color:#334155;margin-top:36px}
   .footer a{color:#475569;text-decoration:none}
   .footer a:hover{color:#64748b}
@@ -30,16 +33,16 @@
 <h1>AI Visibility Reports</h1>
 <p class="subtitle">AI Visibility — auto-refreshed Mon &amp; Thu</p>
 
-<div class="section-title">Active Reports</div>
+<div class="section-title">Reports</div>
 <div class="grid">
 
-  <a class="card" href="../coinsbee/" target="_blank">
+  <a class="card paused" href="../coinsbee/" target="_blank" title="Paused — brand removed from PeekaBoo; data frozen at the last successful refresh">
     <img class="favicon" src="https://www.google.com/s2/favicons?domain=coinsbee.com&sz=32" alt="">
     <div class="card-body">
       <div class="card-name">CoinsBee</div>
       <div class="card-domain">coinsbee.com</div>
     </div>
-    <span class="arrow">→</span>
+    <span class="badge">Paused</span>
   </a>
 
   <a class="card" href="../credibom/" target="_blank">
@@ -78,13 +81,13 @@
     <span class="arrow">→</span>
   </a>
 
-  <a class="card" href="../leroymerlin/" target="_blank">
+  <a class="card paused" href="../leroymerlin/" target="_blank" title="Paused — PeekaBoo account deleted; data frozen at the last successful refresh">
     <img class="favicon" src="https://www.google.com/s2/favicons?domain=leroymerlin.pt&sz=32" alt="">
     <div class="card-body">
       <div class="card-name">Leroy Merlin</div>
       <div class="card-domain">leroymerlin.pt</div>
     </div>
-    <span class="arrow">→</span>
+    <span class="badge">Paused</span>
   </a>
 
   <a class="card" href="../reduniq/" target="_blank">
@@ -105,13 +108,13 @@
     <span class="arrow">→</span>
   </a>
 
-  <a class="card" href="../visitmadeira/" target="_blank">
+  <a class="card paused" href="../visitmadeira/" target="_blank" title="Paused — brand removed from PeekaBoo; data frozen at the last successful refresh">
     <img class="favicon" src="https://www.google.com/s2/favicons?domain=visitmadeira.com&sz=32" alt="">
     <div class="card-body">
       <div class="card-name">Visitmadeira</div>
       <div class="card-domain">visitmadeira.com</div>
     </div>
-    <span class="arrow">→</span>
+    <span class="badge">Paused</span>
   </a>
 
   <a class="card" href="../wizink-pt/" target="_blank">
