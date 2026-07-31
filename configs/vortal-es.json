@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "efeed409-e918-42f3-9631-fbc231b9755f",
+      "name": "Vortal (España)",
+      "key": "vortal-es",
+      "domain": "vortal.biz"
+    }
+  ],
+  "output_file": "vortal-es-report.html"
+}

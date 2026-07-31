@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "545f7c67-c4e7-462f-b4a3-01b4bcd103dc",
+      "name": "Vortal (Portugal)",
+      "key": "vortal-pt",
+      "domain": "vortal.biz"
+    }
+  ],
+  "output_file": "vortal-pt-report.html"
+}
