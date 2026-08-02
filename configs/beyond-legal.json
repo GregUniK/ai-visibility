@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "6cb6d6fb-95a1-4095-8bc4-68200f1e07a5",
+      "name": "Beyond Legal",
+      "key": "beyond-legal",
+      "domain": "beyondlegal.pt"
+    }
+  ],
+  "output_file": "beyond-legal-report.html"
+}
