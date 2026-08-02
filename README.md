@@ -8,6 +8,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 
 | Client | URL | Refresh status |
 |---|---|---|
+| Beyond Legal | https://gregunik.github.io/ai-visibility/beyond-legal/ | ✅ auto |
 | CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from PeekaBoo |
 | Credibom | https://gregunik.github.io/ai-visibility/credibom/ | ✅ auto |
 | El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ✅ auto |
@@ -17,11 +18,13 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
 | UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
 | Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from PeekaBoo |
+| Vortal (Portugal) | https://gregunik.github.io/ai-visibility/vortal-pt/ | ✅ auto |
+| Vortal (España) | https://gregunik.github.io/ai-visibility/vortal-es/ | ✅ auto |
 | WiZink (Portugal) | https://gregunik.github.io/ai-visibility/wizink-pt/ | ✅ auto |
 | WiZink (España) | https://gregunik.github.io/ai-visibility/wizink-es/ | ✅ auto |
 | XTB | https://gregunik.github.io/ai-visibility/xtb/ | ✅ auto |
 
-Status as of 2026-07-17 — all 9 active clients building green. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
+Status as of 2026-08-02 — all 12 active clients building green. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
 
 ---
 
