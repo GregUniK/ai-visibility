@@ -8,6 +8,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 
 | Client | URL | Refresh status |
 |---|---|---|
+| Adelante | https://gregunik.github.io/ai-visibility/adelante/ | ✅ auto |
 | Beyond Legal | https://gregunik.github.io/ai-visibility/beyond-legal/ | ✅ auto |
 | CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from PeekaBoo |
 | Credibom | https://gregunik.github.io/ai-visibility/credibom/ | ✅ auto |
@@ -16,6 +17,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ | ✅ auto |
 | Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⏸ paused — Analytics1 account deleted |
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
+| The Tool Ranch | https://gregunik.github.io/ai-visibility/toolranch/ | ✅ auto |
 | UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
 | Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from PeekaBoo |
 | Vortal (Portugal) | https://gregunik.github.io/ai-visibility/vortal-pt/ | ✅ auto |

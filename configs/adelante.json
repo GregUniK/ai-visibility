@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "7827e88c-1f81-413e-b300-2b435806f6e6",
+      "name": "Adelante",
+      "key": "adelante",
+      "domain": "adelanteshoes.com"
+    }
+  ],
+  "output_file": "adelante-report.html"
+}

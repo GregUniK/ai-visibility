@@ -1,0 +1,11 @@
+{
+  "brands": [
+    {
+      "id": "d0984e4c-3f03-4bad-a76b-f70eb6eff786",
+      "name": "The Tool Ranch",
+      "key": "toolranch",
+      "domain": "thetoolranch.com"
+    }
+  ],
+  "output_file": "toolranch-report.html"
+}
