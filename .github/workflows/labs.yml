@@ -1,0 +1,67 @@
+name: Build labs reports
+
+# Test version of the AI visibility reports (labs/<slug>/index.html).
+# Production (refresh.yml + build_all.py) is separate and unchanged.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'labs-**']
+    paths:
+      - 'labs/tools/**'
+      - 'labs/configs/**'
+      - '.github/workflows/labs.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: labs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r labs/tools/requirements.txt
+
+      - name: Test the builder
+        run: python -m pytest labs/tools -q -p no:cacheprovider
+
+      - name: Build labs reports
+        env:
+          AIV_API_KEY:     ${{ secrets.AIPEEKABOO_API_KEY }}
+          AIV_API_KEY_ECI: ${{ secrets.AIPEEKABOO_API_KEY_ECI }}
+          AIV_API_KEY_LM:  ${{ secrets.AIPEEKABOO_API_KEY_LM }}
+        run: python labs/tools/build_labs.py --all
+
+      # Runs even if one report failed, so the ones that built still ship.
+      # Commits only the built pages, on top of the branch's latest commit: another
+      # labs run or the production refresh may have pushed meanwhile, so a rebase
+      # of the same files would conflict. Retries if the push is rejected.
+      - name: Commit labs reports
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          files=$(ls labs/*/index.html 2>/dev/null || true)
+          if [ -z "$files" ]; then echo "Nothing built"; exit 0; fi
+          branch="$GITHUB_REF_NAME"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin "$branch"
+            git reset --quiet --mixed "origin/$branch"
+            git add -- $files
+            if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+            git commit --quiet -m "labs: rebuild $(date +%Y-%m-%d)"
+            if git push origin "HEAD:$branch"; then exit 0; fi
+            echo "Push rejected (attempt $attempt), retrying"
+            sleep 5
+          done
+          exit 1
