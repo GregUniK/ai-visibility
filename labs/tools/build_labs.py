@@ -36,6 +36,7 @@ import statistics
 import sys
 import threading
 import time
+import unicodedata
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -274,13 +275,23 @@ def infer_intent(text):
 
 
 def normalize_comp_name(name):
-    """Normalized competitor name for de-duplication ('Otterly AI' == 'otterly.ai')."""
+    """Normalized competitor name for de-duplication ('Otterly AI' == 'otterly.ai').
+    Accents don't count ('Hôma' == 'Homa'). Dropping words like 'Labs' and endings like
+    '.com' can leave a generic stub: 'SEO Labs', 'SEO.com' and 'SEO' would all become
+    'seo'. A result under 4 letters therefore keeps the name as written (letters and
+    digits only), and those three stay apart."""
+    name = _strip_accents(name)
     n = name.strip().lower()
     n = re.sub(r'\.(ai|com|io|co|org|net|app)$', '', n)
     n = re.sub(r'\s+ai$', '', n)
     n = re.sub(r'ai$', '', n)
     n = re.sub(r'\s+(digital|agency|media|platform|labs?|technologies?|solutions?)$', '', n)
-    return re.sub(r'[\s\-]', '', n)
+    n = re.sub(r'[\s\-]', '', n)
+    return n if len(n) >= 4 else re.sub(r"[\W_]+", "", name.lower())
+
+
+def _strip_accents(text):
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
 
 
 def comp_domain_from_name(name):
@@ -288,13 +299,18 @@ def comp_domain_from_name(name):
     return slug + ".com"
 
 
-def _brand_context(text, brand_name, window=600):
-    """A text window centred on the brand mention in the full response."""
+def _brand_context(text, names, window=600):
+    """A text window centred on the first of the brand's names (a name, or a list tried in
+    order) found in the full response."""
     if not text:
         return ""
-    idx = text.find(brand_name)
-    if idx == -1:
-        idx = text.lower().find(brand_name.lower())
+    idx = -1
+    for name in ([names] if isinstance(names, str) else names):
+        idx = text.find(name)
+        if idx == -1 and len(name) > 4:  # 'ERA' must be written ERA, not the word 'era'
+            idx = text.lower().find(name.lower())
+        if idx != -1:
+            break
     if idx == -1:
         return text[:window]
     start = max(0, idx - window // 3)
@@ -345,19 +361,24 @@ def fetch_prompt_details(api, brand_id, prompt_ids, workers=4):
     return out
 
 
-def make_alias(brand_name, tracked_names, tracked_ids=None):
+def make_alias(brand_name, tracked_names, tracked_ids=None, brand_domain=""):
     """Map an entity from the answers to the name the report uses.
 
     - The API tags tracked competitors with a competitorId: that wins.
-    - The brand's own variants ("Banco Credibom" for Credibom) map to None: they are the
-      brand, not a competitor (the API sometimes types them "untracked").
+    - The brand's own variants ("Banco Credibom" for Credibom, "ERA Portugal" for ERA
+      Imobiliaria on era.pt) map to None: they are the brand, not a competitor (the API
+      sometimes types them "untracked"). See is_self_name.
     - Other spellings of a tracked competitor ("Cofidis Portugal", "Younited") map to
       the tracked name when their core names match (see same_name).
     Returns (alias, aliases): alias(name, competitor_id=None); aliases[name] = the other
     spellings seen, which the page needs to find those names inside fan-out searches.
+    The brand's own names (brand_self_names) are always in aliases[brand_name].
     """
     tracked_ids = tracked_ids or {}
     aliases, cache = defaultdict(set), {}
+    own = [n for n in brand_self_names(brand_name, brand_domain) if n != brand_name]
+    if own:
+        aliases[brand_name].update(own)
 
     def alias(name, competitor_id=None):
         if competitor_id and competitor_id in tracked_ids:
@@ -366,7 +387,7 @@ def make_alias(brand_name, tracked_names, tracked_ids=None):
                 aliases[canonical].add(name)
             return canonical
         if name not in cache:
-            if same_name(name, brand_name):
+            if is_self_name(name, brand_name, brand_domain):
                 cache[name] = None
                 if name != brand_name:
                     aliases[brand_name].add(name)
@@ -382,8 +403,10 @@ def make_alias(brand_name, tracked_names, tracked_ids=None):
 
 def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_share=0.2):
     """Fetch and shape one brand's prompt data (upstream logic, see module notes)."""
-    brand_id, brand_name = brand["id"], brand["name"]
-    alias, aliases = make_alias(brand_name, tracked_names, tracked_ids)
+    brand_id, brand_name, brand_domain = brand["id"], brand["name"], brand.get("domain", "")
+    alias, aliases = make_alias(brand_name, tracked_names, tracked_ids, brand_domain)
+    own_names = brand_self_names(brand_name, brand_domain)
+    own_lower = {n.lower() for n in own_names}
     print(f"  prompts for {brand_name}...", flush=True)
     listed = fetch_all_prompts(api, brand_id)
     active = [p for p in listed if (p.get("status") or "active") == "active"]
@@ -445,14 +468,14 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
                 mentions_count += 1
                 scores.append(score)
                 reason = next((b.get("mentionSummary", "") for b in brand_mentions
-                               if (b.get("entityName") or "").lower() == brand_name.lower()),
+                               if (b.get("entityName") or "").lower() in own_lower),
                               entry.get("mentionSummary", "") or entry.get("sentimentReason") or "")[:400]
                 if sentiment:
                     full_resp = entry.get("fullResponse") or response_text
                     sentiment_mentions.append({
                         "prompt": prompt_text, "model": model_key, "rank": rank, "score": score,
                         "sentiment": sentiment, "reason": reason,
-                        "context": _brand_context(full_resp, brand_name, 600) or response_text[:400],
+                        "context": _brand_context(full_resp, own_names, 600) or response_text[:400],
                         "competitors": list(answer_comps),
                     })
 
@@ -473,7 +496,7 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
             raw_entries.append({
                 "date": entry.get("date", ""), "model": model_key, "rid": entry.get("runId"),
                 "hit": mentioned, "sc": score, "rk": rank, "snt": sentiment, "rsn": reason,
-                "ctx": (_brand_context(entry.get("fullResponse") or response_text, brand_name, 600)
+                "ctx": (_brand_context(entry.get("fullResponse") or response_text, own_names, 600)
                         or (entry.get("responseSnippet") or "")[:400]) if mentioned else "",
                 "srcs": raw_srcs, "comps": raw_comps,
             })
@@ -637,19 +660,64 @@ GENERIC_NAME_WORDS = {
 
 
 def name_core(name):
-    """The identifying words of a company name ('Banco Cofidis Portugal' -> ('cofidis',))."""
-    return tuple(w for w in re.split(r"[^\w]+", name.lower()) if w and w not in GENERIC_NAME_WORDS)
+    """The identifying words of a company name, accents dropped
+    ('Banco Cofidis Portugal' -> ('cofidis',), 'Cételem' -> ('cetelem',))."""
+    return tuple(w for w in re.split(r"[^\w]+", _strip_accents(name.lower())) if w and w not in GENERIC_NAME_WORDS)
 
 
 def same_name(a, b):
     """Two spellings of one company: equal once normalized, or equal identifying words.
     'Cofidis Portugal' = 'Cofidis', 'Younited' = 'Younited Credit', 'Oney Bank' = 'Oney';
-    but 'Santander' != 'Santander Consumer Finance' and 'Caixa' != 'Caixa Geral de Depósitos'.
-    The page uses the same rule (_sameName in template.html)."""
+    but 'Santander' != 'Santander Consumer Finance', 'Caixa' != 'Caixa Geral de Depósitos'
+    and 'SEO' != 'SEO Labs'. The page uses the same rule (_sameName in template.html)."""
     if normalize_comp_name(a) == normalize_comp_name(b):
         return True
     core_a = name_core(a)
     return bool(core_a) and core_a == name_core(b)
+
+
+def _fold(text):
+    """Letters and digits only, lowercase, no accents: 'El Corte Inglés' -> 'elcorteingles'."""
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text.lower()) if ch.isalnum())
+
+
+def base_name(name):
+    """The configured name without its market label: 'WiZink (España)' -> 'WiZink'."""
+    return re.sub(r"\s*\([^)]*\)\s*$", "", name).strip() or name
+
+
+def domain_stem(domain):
+    """The name part of a domain, folded: 'unik-seo.com' -> 'unikseo', 'www.era.pt' -> 'era'."""
+    host = re.sub(r"^https?://", "", (domain or "").strip().lower()).split("/")[0]
+    labels = [x for x in host.split(".") if x and x != "www"]
+    if len(labels) < 2:
+        return _fold(labels[0]) if labels else ""
+    stem = labels[-2] if len(labels) == 2 or len(labels[-2]) > 3 else labels[-3]  # foo.com.pt -> foo
+    return _fold(stem)
+
+
+def brand_self_names(name, domain=""):
+    """The brand's own names as text writes them: the configured name, the name without its
+    market label ('El Corte Inglés' for 'El Corte Inglés (Casa)') and the leading words
+    that spell its domain ('ERA' for 'ERA Imobiliaria' on era.pt)."""
+    base = base_name(name)
+    out = [name, base]
+    stem, words = domain_stem(domain), base.split()
+    for k in range(1, len(words) + 1):
+        if stem and _fold(" ".join(words[:k])) == stem:
+            out.append(" ".join(words[:k]))
+            break
+    return list(dict.fromkeys(out))
+
+
+def is_self_name(name, brand_name, domain=""):
+    """A spelling of the brand itself: same_name as one of its own names, or a name whose
+    identifying words spell its domain ('ERA Portugal' on era.pt, 'Adelante Shoes' on
+    adelanteshoes.com)."""
+    if any(same_name(name, n) for n in brand_self_names(brand_name, domain)):
+        return True
+    stem = domain_stem(domain)
+    return bool(stem) and stem in (_fold(name), _fold(" ".join(name_core(name))))
 
 
 def tracked_competitors(official_competitors, entity_types):
@@ -751,16 +819,21 @@ def partial_runs(raw_prompts, threshold=0.7, capped_ids=()):
     Only dates between a model's first and last answer are checked: a model added
     later, or dropped, is not a gap in a run. Prompts at the 100-run history
     cap lose their oldest runs part-way through a date, so dates older than the
-    newest "oldest kept date" among capped prompts are not checked either.
+    newest "oldest kept date" among capped prompts are not checked either. A model
+    that usually answers under half of its prompts on a date runs them spread over
+    several days, so its dates are not runs and are not checked.
     """
     capped_ids = set(capped_ids)
     floor = max((min((e["date"] for e in p["entries"] if e.get("date")), default="")
                  for p in raw_prompts if p.get("id") in capped_ids), default="")
-    counts = defaultdict(Counter)
+    counts, prompts_per_model = defaultdict(Counter), Counter()
     for p in raw_prompts:
+        answered = set()
         for e in p["entries"]:
             if e.get("date") and e["date"] >= floor:
                 counts[e["date"]][e["model"]] += 1
+                answered.add(e["model"])
+        prompts_per_model.update(answered)
     dates = sorted(counts)
     if floor and dates and dates[0] == floor:
         dates = dates[1:]  # the floor date itself is partial for the capped prompts
@@ -772,6 +845,8 @@ def partial_runs(raw_prompts, threshold=0.7, capped_ids=()):
         if not nonzero:
             continue
         typical = statistics.median(nonzero)
+        if typical < 0.5 * prompts_per_model[m]:
+            continue
         first = next(i for i, n in enumerate(series) if n > 0)
         last = max(i for i, n in enumerate(series) if n > 0)
         for d, n in list(zip(dates, series))[first:last + 1]:
