@@ -561,7 +561,12 @@ function setSentFilter(f,btn){sentimentFilter=f;document.querySelectorAll('#sent
 /* labs: UTC on both ends (upstream mixed local midnight with toISOString, so "Last 7 days" reached a day further back east of UTC) */
 function _daysBack(dateStr,days){var d=new Date(dateStr+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-days);return d.toISOString().split('T')[0];}
 function _extractDomainJS(url){try{var parsed=new URL(url);var h=parsed.hostname.toLowerCase();return h.startsWith('www.')?h.slice(4):h;}catch(e){return url;}}
-function _normComp(name){var n=name.trim().toLowerCase();n=n.replace(/\.(ai|com|io|co|org|net|app)$/,'');n=n.replace(/\s+ai$/,'');n=n.replace(/ai$/,'');n=n.replace(/\s+(digital|agency|media|platform|labs?|technologies?|solutions?)$/,'');return n.replace(/[\s\-]/g,'');}
+/* same as normalize_comp_name() in build_labs.py: accents don't count ("Hôma" = "Homa"), and a
+   stub under 4 letters ("SEO Labs" -> "seo") keeps the name as written, so "SEO Labs",
+   "SEO.com" and "SEO" stay apart */
+function _noAccents(s){return String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'');}
+function _normComp(name){var n=_noAccents(name).trim().toLowerCase();n=n.replace(/\.(ai|com|io|co|org|net|app)$/,'');n=n.replace(/\s+ai$/,'');n=n.replace(/ai$/,'');n=n.replace(/\s+(digital|agency|media|platform|labs?|technologies?|solutions?)$/,'');n=n.replace(/[\s\-]/g,'');return n.length>=4?n:_plainName(name);}
+function _plainName(n){return _noAccents(n).toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'');}
 function _dedupeComps(comps){var groups={};comps.forEach(function(c){var norm=_normComp(c.name);if(!groups[norm]){groups[norm]={canonical:c.name,canonicalMentions:c.mentions,mentions:0,avgScore:0,topSentiment:c.topSentiment,models:[],modelMentions:{}};}var g=groups[norm];g.mentions+=c.mentions;if(c.mentions>g.canonicalMentions){g.canonical=c.name;g.canonicalMentions=c.mentions;}(c.models||[]).forEach(function(m){if(g.models.indexOf(m)===-1)g.models.push(m);});if(c.modelMentions){Object.keys(c.modelMentions).forEach(function(mk){g.modelMentions[mk]=(g.modelMentions[mk]||0)+c.modelMentions[mk];});}});return Object.values(groups).map(function(g){return {name:g.canonical,mentions:g.mentions,avgScore:0,topSentiment:g.topSentiment,models:g.models,modelMentions:g.modelMentions};}).sort(function(a,b){return b.mentions-a.mentions;});}
 
 function _computeFilteredData(brandKey){
@@ -1815,7 +1820,7 @@ function _num(n){return (n===null||n===undefined)?'—':Number(n).toLocaleString
 /* same rule as same_name() in build_labs.py: equal once normalized, or equal identifying words
    ("Cofidis Portugal" = "Cofidis", "Younited" = "Younited Credit"; "Santander" != "Santander Consumer Finance") */
 var NAME_GENERIC={};('portugal pt españa espana spain es online sa group grupo bank banco credit crédito credito finance financeira financial ltd inc plc de da do of the y e').split(' ').forEach(function(w){NAME_GENERIC[w]=1;});
-function _nameCore(n){return String(n||'').toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter(function(w){return w&&!NAME_GENERIC[w];}).join(' ');}
+function _nameCore(n){return _noAccents(n).toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter(function(w){return w&&!NAME_GENERIC[w];}).join(' ');}
 function _sameName(a,b){if(_normComp(a)===_normComp(b))return true;var ca=_nameCore(a);return !!ca&&ca===_nameCore(b);}
 function _trackedNorms(){return (_labs().tracked||[]).slice();}
 function _isTracked(name,tracked){return (tracked||_trackedNorms()).some(function(t){return _sameName(name,t);});}
@@ -1834,7 +1839,7 @@ function renderLabsNotes(){
   if(inactive.length)items.push((inactive.length===1?'1 prompt that is no longer active is':inactive.length+' prompts that are no longer active are')+' left out of the report’s own numbers (the visibility scores still include '+(inactive.length===1?'it':'them')+'): '+inactive.map(function(a){return '“'+esc(a.text)+'”'+(a.status&&a.status!=='archived'?' ('+esc(a.status)+')':'');}).join(', ')+'.');
   var byDate={};(n.partialRuns||[]).forEach(function(p){(byDate[p.date]=byDate[p.date]||[]).push(p);});
   Object.keys(byDate).sort().forEach(function(d){
-    var parts=byDate[d].map(function(p){return p.count===0?'no '+esc(_modelLabel(p.model))+' answers':esc(_modelLabel(p.model))+' answered '+p.count+' prompts (usually '+p.typical+')';});
+    var parts=byDate[d].map(function(p){return p.count===0?'no '+esc(_modelLabel(p.model))+' answers':esc(_modelLabel(p.model))+' answered '+p.count+' prompt'+(p.count===1?'':'s')+' (usually '+p.typical+')';});
     items.push('Run of '+_fmtDate(d)+': '+parts.join('; ')+'. That run is incomplete, so its counts are low.');
   });
   (n.capped||[]).length&&items.push(n.capped.length+' prompt'+(n.capped.length>1?'s have':' has')+' reached the 100-run history limit, so their oldest runs are missing.');
@@ -1857,7 +1862,19 @@ function _labsCardsHtml(){
   var cards=[];
   if(v&&v.visibility)cards.push(card('Visibility score','Visibility score (0–100): each answer scores higher the earlier the brand appears in it, and answers without the brand score 0.',v.visibility.score+'<span style="font-size:14px;color:var(--ink4);font-weight:600">/100</span>','trend '+esc(v.visibility.trend||'n/a')+' · '+_num(v.visibility.runCount)+' answers'));
   if(v&&v.marketShare)cards.push(card('Share of voice','The brand’s share of all brand mentions (the brand plus every competitor) in the AI answers.',v.marketShare.percentage+'%',_num(v.marketShare.brandMentions)+' of '+_num(v.marketShare.totalMentions)+' brand mentions'));
-  if(cp&&cp.summary&&cp.summary.brandRankAmongCompetitors)cards.push(card('Rank','Position among the tracked competitors, by visibility score in the latest run.','#'+cp.summary.brandRankAmongCompetitors+'<span style="font-size:14px;color:var(--ink4);font-weight:600"> of '+(cp.summary.totalCompetitors+1)+'</span>','vs tracked competitors · latest run'));
+  if(cp&&cp.summary&&cp.summary.brandRankAmongCompetitors){
+    /* the API breaks ties in its own order, so a brand that no AI named can come out "#2";
+       the position here is 1 + the competitors with a higher score, and ties are said */
+    var rankTip='Position among the tracked competitors, by visibility score in the latest run.',of=cp.summary.totalCompetitors+1;
+    var bs=cp.brand?cp.brand.score:null,others=(cp.competitors||[]).map(function(c){return c.score;});
+    var known=typeof bs==='number'&&others.length>0&&others.every(function(x){return typeof x==='number';});
+    if(bs===0)cards.push(card('Rank',rankTip,'Not named','no AI named it in the latest run · '+of+' brands tracked'));
+    else{
+      var tied=known?others.filter(function(x){return x===bs;}).length:0;
+      var pos=known?others.filter(function(x){return x>bs;}).length+1:cp.summary.brandRankAmongCompetitors;
+      cards.push(card('Rank',rankTip,'#'+pos+'<span style="font-size:14px;color:var(--ink4);font-weight:600"> of '+of+'</span>',(tied?'tied with '+tied+' · ':'')+'vs tracked competitors · latest run'));
+    }
+  }
   if(bm&&bm.models&&bm.models.length){
     var mx=Math.max.apply(null,bm.models.map(function(m){return m.visibilityScore||0;}).concat([1]));
     var rows=bm.models.slice().sort(function(a,b){return (b.visibilityScore||0)-(a.visibilityScore||0);}).map(function(m){
@@ -1913,36 +1930,67 @@ function _nameRe(names){
   if(!parts.length)return null;
   try{return new RegExp('(^|[^\\p{L}\\p{N}])(?:'+parts.join('|')+')(?=$|[^\\p{L}\\p{N}])','giu');}catch(err){return new RegExp('(^|\\W)(?:'+parts.join('|')+')(?=$|\\W)','gi');}
 }
-/* brand groups found in searches: the brand, each tracked competitor (all its spellings), other names */
+/* brand groups found in searches: the brand (its own names come from the builder, see
+   brand_self_names), each tracked competitor (all its spellings), other names */
 function _foBrandGroups(){
   var bk=BRAND_CFG[currentBrand].key,brandName=BRAND_CFG[currentBrand].name,norms=_trackedNorms(),al=_labs().aliases||{};
-  var groups=[{name:brandName,kind:'you',spellings:[brandName].concat(al[brandName]||[])}],byNorm={};
-  byNorm[_normComp(brandName)]=groups[0];
-  (al[brandName]||[]).forEach(function(n){byNorm[_normComp(n)]=groups[0];});
+  var own=[brandName,brandName.replace(/\s*\([^)]*\)\s*$/,'')].concat(al[brandName]||[]).filter(function(n,i,a){return n&&a.indexOf(n)===i;});
+  var groups=[{name:brandName,kind:'you',spellings:own}],byNorm={};
+  own.forEach(function(n){byNorm[_normComp(n)]=groups[0];});
   (_labs().tracked||[]).forEach(function(n){var k=_normComp(n);if(byNorm[k])return;var g={name:n,kind:'tracked',spellings:[n].concat(al[n]||[])};groups.push(g);byNorm[k]=g;(al[n]||[]).forEach(function(a){byNorm[_normComp(a)]=g;});});
   _dedupeComps(D_ORIG.competitors[bk]||[]).slice(0,80).forEach(function(c){
-    var k=_normComp(c.name);if(byNorm[k])return;
+    /* another spelling of a name already listed ("hôma" for "Homa"): searches may use it too */
+    var k=_normComp(c.name);if(byNorm[k]){if(byNorm[k].spellings.indexOf(c.name)===-1)byNorm[k].spellings.push(c.name);return;}
     if(_isTracked(c.name,norms)){var tg=groups.find(function(g){return g.kind==='tracked'&&_sameName(c.name,g.name);});if(tg){tg.spellings.push(c.name);byNorm[k]=tg;return;}}
+    /* a short word plus generic ones ("SEO Portugal") reads as a phrase in a search, not a brand */
+    var core=_nameCore(c.name).replace(/\s+/g,'');if(core&&core.length<4&&core!==_plainName(c.name))return;
     var g={name:c.name,kind:'other',spellings:[c.name]};groups.push(g);byNorm[k]=g;
   });
-  groups.forEach(function(g){g.re=_nameRe(g.spellings);});
   return groups;
 }
+/* one pattern per spelling, longest first. The AIs write brands with a capital ("Hoka",
+   "ANOgov", "DEGIRO") and words in lowercase, so other brands' names, and short names like
+   "ERA", count only when written with a capital or exactly as the brand writes them:
+   "Casa" the store, not the word "casa"; "Licitaciones" the company, not "licitaciones" */
+function _foMatcher(groups){
+  var items=[];
+  groups.forEach(function(g,gi){(g.spellings||[]).forEach(function(s){
+    s=String(s||'').trim();var re=_nameRe([s]);if(re)items.push({gi:gi,s:s,len:s.length,strict:g.kind!=='you'||s.length<=4,re:re});
+  });});
+  return items.sort(function(a,b){return b.len-a.len;});
+}
+/* brand names in one search: each stretch of text goes to the longest name that covers it
+   ("Zara Home" is not also "Zara"). Returns the groups found and the text without them. */
+function _foMatch(q,items){
+  var taken=[],hits={};
+  items.forEach(function(it){
+    it.re.lastIndex=0;var m;
+    while((m=it.re.exec(q))){
+      var st=m.index+m[1].length,en=m.index+m[0].length,t=q.slice(st,en);
+      if(it.strict&&t!==it.s&&t===t.toLowerCase())continue;
+      if(!taken.some(function(x){return st<x[1]&&en>x[0];})){taken.push([st,en]);hits[it.gi]=1;}
+    }
+  });
+  var rest=q;taken.sort(function(a,b){return b[0]-a[0];}).forEach(function(t){rest=rest.slice(0,t[0])+' '+rest.slice(t[1]);});
+  return {hits:hits,rest:rest};
+}
+function _foNoSite(q){return String(q||'').replace(/site:\S+/gi,' ');}
 function _foBrands(rows){
-  return _foBrandGroups().map(function(g){var hits=g.re?rows.filter(function(r){g.re.lastIndex=0;return g.re.test(r.q);}):[];return {name:g.name,kind:g.kind,rows:hits,count:hits.length};})
+  var groups=_foBrandGroups(),items=_foMatcher(groups),found=groups.map(function(){return [];});
+  rows.forEach(function(r){var h=_foMatch(_foNoSite(r.q),items).hits;Object.keys(h).forEach(function(gi){found[gi].push(r);});});
+  return groups.map(function(g,gi){return {name:g.name,kind:g.kind,rows:found[gi],count:found[gi].length};})
     .filter(function(c){return c.count>0;}).sort(function(a,b){return b.count-a.count;});
 }
 /* words of a search, without site: operators, brand names, stop words or years */
-function _foTokens(q,groups){
-  var t=q.toLowerCase().replace(/site:\S+/g,' ');
-  (groups||[]).forEach(function(g){if(g.re){g.re.lastIndex=0;t=t.replace(g.re,'$1 ');}});
+function _foTokens(q,items){
+  var t=_foMatch(_foNoSite(q),items||[]).rest.toLowerCase();
   return t.replace(/["“”'’()\[\],.;:!?|/]/g,' ').split(/\s+/).filter(function(w){return w&&w.length>2&&!FO_STOP[w]&&!/^(19|20)\d\d$/.test(w)&&!/^\d+$/.test(w);});
 }
 /* recurring themes = keywords found in 3+ searches. Words present in more than 30% of the
    searches (the category and the market, e.g. "crédito", "portugal") are context, not themes.
    Plurals fold into the singular; each theme shows the phrase it most often appears in. */
 function _foThemes(rows){
-  var groups=_foBrandGroups(),toks=rows.map(function(r){return _foTokens(r.q,groups);}),n=rows.length,wdf={};
+  var items=_foMatcher(_foBrandGroups()),toks=rows.map(function(r){return _foTokens(r.q,items);}),n=rows.length,wdf={};
   toks.forEach(function(ts){var seen={};ts.forEach(function(w){if(!seen[w]){seen[w]=1;wdf[w]=(wdf[w]||0)+1;}});});
   var root=function(w){if(/es$/.test(w)&&wdf[w.slice(0,-2)])return w.slice(0,-2);if(/s$/.test(w)&&wdf[w.slice(0,-1)])return w.slice(0,-1);return w;};
   var th={};
@@ -1964,9 +2012,12 @@ function _foThemes(rows){
   return {themes:themes,common:common.map(function(t){return {word:t.label,count:t.rows.length};})};
 }
 function _foKindTag(kind){return kind==='you'?'<span class="tag tag-you">You</span>':kind==='tracked'?'<span class="tag tag-tracked">Tracked</span>':kind==='competitor'?'<span class="tag tag-tracked">Competitor</span>':kind==='third'?'<span class="tag tag-other">Third party</span>':'<span class="tag tag-other">Not tracked</span>';}
+/* the name part of a domain, like domain_stem() in build_labs.py: "www.elcorteingles.pt" -> "elcorteingles" */
+function _domainStem(d){var l=String(d||'').toLowerCase().replace(/^https?:\/\//,'').split('/')[0].split('.').filter(function(x){return x&&x!=='www';});var s=l.length<2?(l[0]||''):(l.length===2||l[l.length-2].length>3?l[l.length-2]:l[l.length-3]);return _plainName(s);}
 function _foDomainKind(d){
   var own=(BRAND_CFG[currentBrand].url||'').toLowerCase();
-  if(own&&(d===own||d.slice(-own.length-1)==='.'+own))return 'you';
+  /* the brand's own site, in any country (elcorteingles.es for elcorteingles.pt) */
+  if(own&&(d===own||d.slice(-own.length-1)==='.'+own||_domainStem(d)===_domainStem(own)))return 'you';
   var cp=(_official().competitors||{}).competitors||[];
   for(var i=0;i<cp.length;i++){var cd=_extractDomainJS(cp[i].url||'');if(cd&&(d===cd||d.slice(-cd.length-1)==='.'+cd))return 'competitor';}
   return 'other';

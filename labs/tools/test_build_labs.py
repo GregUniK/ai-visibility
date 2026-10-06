@@ -93,9 +93,59 @@ def test_tracked_competitors_merge_api_list_and_mention_types():
     ("Caixa", "Caixa Geral de Depósitos", False),
     ("DECO", "DECO PROteste", False),
     ("Banco", "Banco CTT", False),
+    ("Otterly AI", "otterly.ai", True),
+    ("SEO", "SEO Labs", False),  # dropping "Labs" leaves a stub, not a company
+    ("SEO.com", "SEO Labs", False),
+    ("SEO", "seo", True),
+    ("Hôma", "Homa", True),  # accents don't count
+    ("Cételem", "Cetelem Portugal", True),
 ])
 def test_same_name_matches_spellings_not_related_companies(a, b, same):
     assert bl.same_name(a, b) is same
+
+
+@pytest.mark.parametrize("domain,stem", [
+    ("era.pt", "era"), ("www.unik-seo.com", "unikseo"), ("https://foo.com.pt/x", "foo"),
+    ("info.vortal.biz", "vortal"), ("", ""),
+])
+def test_domain_stem(domain, stem):
+    assert bl.domain_stem(domain) == stem
+
+
+def test_brand_self_names_drop_the_market_label_and_spell_the_domain():
+    assert bl.brand_self_names("El Corte Inglés (Casa)", "elcorteingles.pt") == [
+        "El Corte Inglés (Casa)", "El Corte Inglés"]
+    assert bl.brand_self_names("ERA Imobiliaria", "era.pt") == ["ERA Imobiliaria", "ERA"]
+    assert bl.brand_self_names("UniK SEO", "unik-seo.com") == ["UniK SEO"]
+
+
+@pytest.mark.parametrize("name,brand,domain,self_", [
+    ("ERA Portugal", "ERA Imobiliaria", "era.pt", True),
+    ("Adelante Shoes", "Adelante", "adelanteshoes.com", True),
+    ("El Corte Inglés Portugal", "El Corte Inglés (Sport)", "elcorteingles.pt", True),
+    ("WiZink Bank", "WiZink (España)", "wizink.es", True),
+    ("Century 21 Portugal", "ERA Imobiliaria", "era.pt", False),
+    ("SEO", "UniK SEO", "unik-seo.com", False),
+])
+def test_is_self_name(name, brand, domain, self_):
+    assert bl.is_self_name(name, brand, domain) is self_
+
+
+def test_alias_knows_the_brand_by_its_domain_and_keeps_stubs_apart():
+    alias, aliases = bl.make_alias("ERA Imobiliaria", ["SEO Labs", "Century 21 Portugal"], {}, "era.pt")
+    assert alias("ERA Portugal") is None
+    assert alias("SEO") == "SEO" and alias("SEO.com") == "SEO.com"
+    assert alias("Century 21") == "Century 21 Portugal"
+    assert {k: sorted(v) for k, v in aliases.items()} == {
+        "ERA Imobiliaria": ["ERA", "ERA Portugal"], "Century 21 Portugal": ["Century 21"]}
+
+
+def test_brand_context_finds_the_name_without_its_label():
+    text = "x" * 500 + " A El Corte Inglés tem ótimas lojas."
+    ctx = bl._brand_context(text, ["El Corte Inglés (Casa)", "El Corte Inglés"], 100)
+    assert "El Corte Inglés tem" in ctx and ctx.startswith("…")
+    # a short name must be written as the brand writes it: "era" is a word
+    assert bl._brand_context("Esta era a melhor. " + "y" * 300, ["ERA"], 40) == ("Esta era a melhor. " + "y" * 300)[:40]
 
 
 def test_tracked_lists_and_domains_follow_same_name():
@@ -170,6 +220,15 @@ def test_partial_runs_flags_missing_and_low_models_only():
     prompts.append(p([("2026-08-11", "new-model")]))  # starts late: never flagged before it began
     notes = bl.partial_runs(prompts)
     assert notes == [{"date": "2026-08-06", "model": "aio", "count": 4, "typical": 10}]
+
+
+def test_partial_runs_skips_a_model_that_spreads_its_prompts_over_days():
+    # model x answers 2 of its 10 prompts a day (a rolling schedule); y runs all 10 at once and
+    # misses half on day 3
+    prompts = [{"id": f"p{i}", "entries": [{"date": f"d{i // 2}", "model": "x"}] +
+                [{"date": f"d{d}", "model": "y"} for d in range(5) if not (d == 3 and i % 2)]}
+               for i in range(10)]
+    assert bl.partial_runs(prompts) == [{"date": "d3", "model": "y", "count": 5, "typical": 10}]
 
 
 def test_partial_runs_flags_a_model_missing_from_a_run():
