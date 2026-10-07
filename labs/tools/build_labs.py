@@ -287,7 +287,7 @@ def normalize_comp_name(name):
     n = re.sub(r'ai$', '', n)
     n = re.sub(r'\s+(digital|agency|media|platform|labs?|technologies?|solutions?)$', '', n)
     n = re.sub(r'[\s\-]', '', n)
-    return n if len(n) >= 4 else re.sub(r"[\W_]+", "", name.lower())
+    return n if len(n) >= 4 else _plain(name)
 
 
 def _strip_accents(text):
@@ -367,7 +367,8 @@ def make_alias(brand_name, tracked_names, tracked_ids=None, brand_domain=""):
     - The API tags tracked competitors with a competitorId: that wins.
     - The brand's own variants ("Banco Credibom" for Credibom, "ERA Portugal" for ERA
       Imobiliaria on era.pt) map to None: they are the brand, not a competitor (the API
-      sometimes types them "untracked"). See is_self_name.
+      sometimes types them "untracked"). See is_self_name. So does a word of the brand's
+      name standing alone ("SEO" for UniK SEO): the category. See is_name_word.
     - Other spellings of a tracked competitor ("Cofidis Portugal", "Younited") map to
       the tracked name when their core names match (see same_name).
     Returns (alias, aliases): alias(name, competitor_id=None); aliases[name] = the other
@@ -391,6 +392,8 @@ def make_alias(brand_name, tracked_names, tracked_ids=None, brand_domain=""):
                 cache[name] = None
                 if name != brand_name:
                     aliases[brand_name].add(name)
+            elif is_name_word(name, brand_name):
+                cache[name] = None  # the category ("SEO" for UniK SEO), not a competitor
             else:
                 exact = next((t for t in tracked_names if normalize_comp_name(t) == normalize_comp_name(name)), None)
                 cache[name] = exact or next((t for t in tracked_names if same_name(name, t)), name)
@@ -686,14 +689,17 @@ def base_name(name):
     return re.sub(r"\s*\([^)]*\)\s*$", "", name).strip() or name
 
 
+_SECOND_LEVEL = {"com", "co", "org", "net", "gov", "edu", "ac", "nom", "gob", "mil"}
+
+
 def domain_stem(domain):
-    """The name part of a domain, folded: 'unik-seo.com' -> 'unikseo', 'www.era.pt' -> 'era'."""
+    """The name part of a domain, folded: 'unik-seo.com' -> 'unikseo', 'www.era.pt' -> 'era',
+    'foo.com.pt' -> 'foo', 'app.n26.com' -> 'n26'."""
     host = re.sub(r"^https?://", "", (domain or "").strip().lower()).split("/")[0]
     labels = [x for x in host.split(".") if x and x != "www"]
     if len(labels) < 2:
         return _fold(labels[0]) if labels else ""
-    stem = labels[-2] if len(labels) == 2 or len(labels[-2]) > 3 else labels[-3]  # foo.com.pt -> foo
-    return _fold(stem)
+    return _fold(labels[-3] if len(labels) >= 3 and labels[-2] in _SECOND_LEVEL else labels[-2])
 
 
 def brand_self_names(name, domain=""):
@@ -708,6 +714,17 @@ def brand_self_names(name, domain=""):
             out.append(" ".join(words[:k]))
             break
     return list(dict.fromkeys(out))
+
+
+def _plain(name):
+    return re.sub(r"[\W_]+", "", _strip_accents(name).lower())
+
+
+def is_name_word(name, brand_name):
+    """A word of the client's own name standing alone: 'SEO' for 'UniK SEO', 'Imobiliaria'
+    for 'ERA Imobiliaria'. The AIs use it for the category, so it is not a competitor."""
+    words = base_name(brand_name).split()
+    return len(words) > 1 and _plain(name) in {_plain(w) for w in words}
 
 
 def is_self_name(name, brand_name, domain=""):
@@ -816,27 +833,26 @@ def compact_fanout(queries, raw_prompts):
 def partial_runs(raw_prompts, threshold=0.7, capped_ids=()):
     """Runs where a model answered far fewer prompts than usual (0 = missing entirely).
 
-    Only dates between a model's first and last answer are checked: a model added
-    later, or dropped, is not a gap in a run. Prompts at the 100-run history
-    cap lose their oldest runs part-way through a date, so dates older than the
-    newest "oldest kept date" among capped prompts are not checked either. A model
-    that usually answers under half of its prompts on a date runs them spread over
-    several days, so its dates are not runs and are not checked.
+    Only run dates are checked: dates on which some model answered at least half of
+    the prompts. A brand that runs a few prompts a day (Adelante until September) has
+    dates that are not runs. Only run dates between a model's first and last answer
+    are checked: a model added later, or dropped, is not a gap in a run. Prompts at
+    the 100-run history cap lose their oldest runs part-way through a date, so dates
+    older than the newest "oldest kept date" among capped prompts are not checked either.
     """
     capped_ids = set(capped_ids)
     floor = max((min((e["date"] for e in p["entries"] if e.get("date")), default="")
                  for p in raw_prompts if p.get("id") in capped_ids), default="")
-    counts, prompts_per_model = defaultdict(Counter), Counter()
+    counts, answered = defaultdict(Counter), 0
     for p in raw_prompts:
-        answered = set()
-        for e in p["entries"]:
-            if e.get("date") and e["date"] >= floor:
-                counts[e["date"]][e["model"]] += 1
-                answered.add(e["model"])
-        prompts_per_model.update(answered)
+        dated = [e for e in p["entries"] if e.get("date") and e["date"] >= floor]
+        for e in dated:
+            counts[e["date"]][e["model"]] += 1
+        answered += bool(dated)
     dates = sorted(counts)
     if floor and dates and dates[0] == floor:
         dates = dates[1:]  # the floor date itself is partial for the capped prompts
+    dates = [d for d in dates if max(counts[d].values()) >= 0.5 * answered]
     models = sorted({m for d in dates for m in counts[d]})
     notes = []
     for m in models:
@@ -845,8 +861,6 @@ def partial_runs(raw_prompts, threshold=0.7, capped_ids=()):
         if not nonzero:
             continue
         typical = statistics.median(nonzero)
-        if typical < 0.5 * prompts_per_model[m]:
-            continue
         first = next(i for i, n in enumerate(series) if n > 0)
         last = max(i for i, n in enumerate(series) if n > 0)
         for d, n in list(zip(dates, series))[first:last + 1]:

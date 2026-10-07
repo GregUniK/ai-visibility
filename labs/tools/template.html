@@ -1942,25 +1942,26 @@ function _foBrandGroups(){
     /* another spelling of a name already listed ("hôma" for "Homa"): searches may use it too */
     var k=_normComp(c.name);if(byNorm[k]){if(byNorm[k].spellings.indexOf(c.name)===-1)byNorm[k].spellings.push(c.name);return;}
     if(_isTracked(c.name,norms)){var tg=groups.find(function(g){return g.kind==='tracked'&&_sameName(c.name,g.name);});if(tg){tg.spellings.push(c.name);byNorm[k]=tg;return;}}
-    /* a short word plus generic ones ("SEO Portugal") reads as a phrase in a search, not a brand */
-    var core=_nameCore(c.name).replace(/\s+/g,'');if(core&&core.length<4&&core!==_plainName(c.name))return;
     var g={name:c.name,kind:'other',spellings:[c.name]};groups.push(g);byNorm[k]=g;
   });
   return groups;
 }
-/* one pattern per spelling, longest first. The AIs write brands with a capital ("Hoka",
-   "ANOgov", "DEGIRO") and words in lowercase, so other brands' names, and short names like
-   "ERA", count only when written with a capital or exactly as the brand writes them:
-   "Casa" the store, not the word "casa"; "Licitaciones" the company, not "licitaciones" */
+/* one pattern per spelling: the brand's and the tracked competitors' first, then the other
+   names, longest first within each. The AIs write brands with a capital ("Hoka", "ANOgov",
+   "DEGIRO") and words in lowercase, so other brands' names, and short names like "ERA", count
+   only when written with a capital or exactly as the brand writes them: "Casa" the store,
+   not the word "casa"; "Licitaciones" the company, not "licitaciones" */
 function _foMatcher(groups){
   var items=[];
   groups.forEach(function(g,gi){(g.spellings||[]).forEach(function(s){
-    s=String(s||'').trim();var re=_nameRe([s]);if(re)items.push({gi:gi,s:s,len:s.length,strict:g.kind!=='you'||s.length<=4,re:re});
+    s=String(s||'').trim();var re=_nameRe([s]);if(re)items.push({gi:gi,s:s,len:s.length,other:g.kind==='other'?1:0,strict:g.kind!=='you'||s.length<=4,re:re});
   });});
-  return items.sort(function(a,b){return b.len-a.len;});
+  return items.sort(function(a,b){return (a.other-b.other)||(b.len-a.len);});
 }
-/* brand names in one search: each stretch of text goes to the longest name that covers it
-   ("Zara Home" is not also "Zara"). Returns the groups found and the text without them. */
+/* brand names in one search: each stretch of text goes to the first name in that order that
+   covers it, so "Zara Home" is not also "Zara", and an untracked "WiZink Extra" or "Santander
+   Totta" doesn't take searches from the brand or from tracked Santander. Returns the groups
+   found and the text without them. */
 function _foMatch(q,items){
   var taken=[],hits={};
   items.forEach(function(it){
@@ -1978,8 +1979,14 @@ function _foNoSite(q){return String(q||'').replace(/site:\S+/gi,' ');}
 function _foBrands(rows){
   var groups=_foBrandGroups(),items=_foMatcher(groups),found=groups.map(function(){return [];});
   rows.forEach(function(r){var h=_foMatch(_foNoSite(r.q),items).hits;Object.keys(h).forEach(function(gi){found[gi].push(r);});});
-  return groups.map(function(g,gi){return {name:g.name,kind:g.kind,rows:found[gi],count:found[gi].length};})
+  var all=groups.map(function(g,gi){return {name:g.name,kind:g.kind,rows:found[gi],count:found[gi].length};})
     .filter(function(c){return c.count>0;}).sort(function(a,b){return b.count-a.count;});
+  /* an untracked name in more than 30% of the searches ("SEO" for an SEO agency) is the
+     category, not a brand: listed apart, like the context words of the themes */
+  var common=rows.length>=20?all.filter(function(c){return c.kind==='other'&&c.count/rows.length>0.3;}):[];
+  var out=all.filter(function(c){return common.indexOf(c)===-1;});
+  out.common=common;
+  return out;
 }
 /* words of a search, without site: operators, brand names, stop words or years */
 function _foTokens(q,items){
@@ -2012,8 +2019,10 @@ function _foThemes(rows){
   return {themes:themes,common:common.map(function(t){return {word:t.label,count:t.rows.length};})};
 }
 function _foKindTag(kind){return kind==='you'?'<span class="tag tag-you">You</span>':kind==='tracked'?'<span class="tag tag-tracked">Tracked</span>':kind==='competitor'?'<span class="tag tag-tracked">Competitor</span>':kind==='third'?'<span class="tag tag-other">Third party</span>':'<span class="tag tag-other">Not tracked</span>';}
-/* the name part of a domain, like domain_stem() in build_labs.py: "www.elcorteingles.pt" -> "elcorteingles" */
-function _domainStem(d){var l=String(d||'').toLowerCase().replace(/^https?:\/\//,'').split('/')[0].split('.').filter(function(x){return x&&x!=='www';});var s=l.length<2?(l[0]||''):(l.length===2||l[l.length-2].length>3?l[l.length-2]:l[l.length-3]);return _plainName(s);}
+/* the name part of a domain, like domain_stem() in build_labs.py: "www.elcorteingles.pt" -> "elcorteingles",
+   "foo.com.pt" -> "foo", "app.n26.com" -> "n26" */
+var SECOND_LEVEL={com:1,co:1,org:1,net:1,gov:1,edu:1,ac:1,nom:1,gob:1,mil:1};
+function _domainStem(d){var l=String(d||'').toLowerCase().replace(/^https?:\/\//,'').split('/')[0].split('.').filter(function(x){return x&&x!=='www';});var s=l.length<2?(l[0]||''):(l.length>=3&&SECOND_LEVEL[l[l.length-2]]?l[l.length-3]:l[l.length-2]);return _plainName(s);}
 function _foDomainKind(d){
   var own=(BRAND_CFG[currentBrand].url||'').toLowerCase();
   /* the brand's own site, in any country (elcorteingles.es for elcorteingles.pt) */
@@ -2105,7 +2114,9 @@ function renderFanout(){
   /* brands named in searches */
   var brands=_foBrands(rows),bMax=brands.length?brands[0].count:1;
   brands.forEach(function(b){_foSets['brand:'+b.name]=new Set(b.rows);});
-  var brandHtml='<div class="cc"><div class="cc-head"><div><div class="cc-title">Brands named in searches</div><div class="cc-sub">searches that contain a brand’s name · click one to list them</div></div></div><div class="cc-body">'+
+  var brandHtml='<div class="cc"><div class="cc-head"><div><div class="cc-title">Brands named in searches</div><div class="cc-sub">searches that contain a brand’s name · click one to list them</div></div></div>'+
+    (brands.common.length?'<div style="padding:8px 18px;border-bottom:1px solid var(--border);font-size:12px;color:var(--ink3)">In most searches, so not listed: '+brands.common.map(function(c){return '<b>'+esc(c.name)+'</b> ('+c.count+')';}).join(', ')+'</div>':'')+
+    '<div class="cc-body">'+
     (brands.length?brands.slice(0,12).map(function(b){var dom=b.kind==='you'?(BRAND_CFG[currentBrand].url||''):_compDomain(b.name);return '<div'+_foPickAttrs('brand:'+b.name).replace('class="','class="comp-row ')+' style="padding-left:4px"><img class="comp-fav" src="'+fav(dom)+'" onerror="this.style.visibility=\'hidden\'"><div class="comp-name">'+esc(b.name)+_foKindTag(b.kind)+'</div><div class="comp-bar-wrap"><div class="comp-bar" style="width:'+Math.round(b.count/bMax*100)+'%;'+(b.kind==='you'?'background:rgba(79,70,229,.85)':'')+'"></div></div><div class="comp-count">'+b.count+' search'+(b.count!==1?'es':'')+'</div></div>';}).join(''):'<div class="fo-empty">No brand names in these searches.</div>')+'</div></div>';
   if(foPick&&!_foSets[foPick])foPick='';
   /* categories */

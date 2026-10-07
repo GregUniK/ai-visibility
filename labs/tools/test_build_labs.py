@@ -106,7 +106,8 @@ def test_same_name_matches_spellings_not_related_companies(a, b, same):
 
 @pytest.mark.parametrize("domain,stem", [
     ("era.pt", "era"), ("www.unik-seo.com", "unikseo"), ("https://foo.com.pt/x", "foo"),
-    ("info.vortal.biz", "vortal"), ("", ""),
+    ("info.vortal.biz", "vortal"), ("app.n26.com", "n26"), ("empresas.ing.es", "ing"),
+    ("base.gov.pt", "base"), ("", ""),
 ])
 def test_domain_stem(domain, stem):
     assert bl.domain_stem(domain) == stem
@@ -138,6 +139,15 @@ def test_alias_knows_the_brand_by_its_domain_and_keeps_stubs_apart():
     assert alias("Century 21") == "Century 21 Portugal"
     assert {k: sorted(v) for k, v in aliases.items()} == {
         "ERA Imobiliaria": ["ERA", "ERA Portugal"], "Century 21 Portugal": ["Century 21"]}
+
+
+def test_a_word_of_the_brand_name_alone_is_the_category_not_a_competitor():
+    alias, aliases = bl.make_alias("UniK SEO", ["SEO Labs"], {}, "unik-seo.com")
+    assert alias("SEO") is None and alias("seo") is None
+    assert alias("SEO.com") == "SEO.com" and alias("SEO Labs") == "SEO Labs"
+    assert dict(aliases) == {}
+    alias, _ = bl.make_alias("Credibom", [], {}, "credibom.pt")  # a one-word name has no such words
+    assert alias("Cofidis") == "Cofidis"
 
 
 def test_brand_context_finds_the_name_without_its_label():
@@ -201,10 +211,10 @@ def test_partial_runs_does_not_flag_a_model_after_it_was_dropped():
 
 
 def test_partial_runs_skips_dates_cut_by_the_history_cap():
-    # 4 prompts at the 100-run cap keep only dates b-d, so date "a" looks thin without the floor.
-    prompts = [_prompt(f"p{i}", "abcd", "xy") for i in range(2)] + [_prompt(f"c{i}", "bcd", "xy") for i in range(4)]
+    # 2 prompts at the 100-run cap keep only dates b-d, so date "a" looks thin without the floor.
+    prompts = [_prompt(f"p{i}", "abcd", "xy") for i in range(4)] + [_prompt(f"c{i}", "bcd", "xy") for i in range(2)]
     assert bl.partial_runs(prompts) != []  # without telling it which prompts are capped
-    assert bl.partial_runs(prompts, capped_ids=[f"c{i}" for i in range(4)]) == []
+    assert bl.partial_runs(prompts, capped_ids=[f"c{i}" for i in range(2)]) == []
 
 
 def test_partial_runs_flags_missing_and_low_models_only():
@@ -222,13 +232,27 @@ def test_partial_runs_flags_missing_and_low_models_only():
     assert notes == [{"date": "2026-08-06", "model": "aio", "count": 4, "typical": 10}]
 
 
-def test_partial_runs_skips_a_model_that_spreads_its_prompts_over_days():
-    # model x answers 2 of its 10 prompts a day (a rolling schedule); y runs all 10 at once and
-    # misses half on day 3
-    prompts = [{"id": f"p{i}", "entries": [{"date": f"d{i // 2}", "model": "x"}] +
-                [{"date": f"d{d}", "model": "y"} for d in range(5) if not (d == 3 and i % 2)]}
-               for i in range(10)]
-    assert bl.partial_runs(prompts) == [{"date": "d3", "model": "y", "count": 5, "typical": 10}]
+def test_partial_runs_checks_only_run_dates():
+    # Adelante's shape: 10 days of 3 prompts a day, then 4 full runs of all 30 prompts, where
+    # model y answered only 13 on the third. The daily dates are not runs; the short run is.
+    entries = {i: [] for i in range(30)}
+    for day in range(10):
+        for i in range(day * 3, day * 3 + 3):
+            entries[i] += [{"date": f"a{day}", "model": m} for m in "xy"]
+    for run in range(4):
+        for i in range(30):
+            entries[i] += [{"date": f"b{run}", "model": m} for m in "xy" if not (run == 2 and m == "y" and i >= 13)]
+    prompts = [{"id": f"p{i}", "entries": e} for i, e in entries.items()]
+    assert bl.partial_runs(prompts) == [{"date": "b2", "model": "y", "count": 13, "typical": 30}]
+
+
+def test_partial_runs_flags_a_missing_model_after_the_prompt_set_grew():
+    # 20 prompts for 10 runs, then 60 for 3 runs; model y is missing from one of the later runs
+    prompts = [{"id": f"p{i}", "entries": ([{"date": f"a{r}", "model": m} for r in range(10) for m in "xy"]
+                                           if i < 20 else []) +
+                [{"date": f"b{r}", "model": m} for r in range(3) for m in "xy" if not (r == 1 and m == "y")]}
+               for i in range(60)]
+    assert bl.partial_runs(prompts) == [{"date": "b1", "model": "y", "count": 0, "typical": 60}]
 
 
 def test_partial_runs_flags_a_model_missing_from_a_run():
