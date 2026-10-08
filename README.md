@@ -40,7 +40,8 @@ A failing client keeps serving its last good report; the run goes red and opens 
   account and 1,014 on the El Corte Inglés account; the main account allows about 2,000 a day.
 - **Labs** (`labs/`, see `labs/README.md`) is the preview: a change to the builder rebuilds the
   Credibom labs page at /ai-visibility/labs/credibom/ straight away; the live reports pick it up
-  at the next refresh. To check every client before merging, run `labs.yml` on the PR branch.
+  at the next refresh. To check every client before merging, run **Refresh AI Visibility
+  Reports** on the PR branch: it commits the built pages to that branch, not to `main`.
 
 ---
 

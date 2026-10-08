@@ -50,7 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          files=$(for c in configs/*.json; do s=$(basename "$c" .json); [ -f "$s/index.html" ] && echo "$s/index.html"; done)
+          files=$(for c in configs/*.json; do s=$(basename "$c" .json); if [ -f "$s/index.html" ]; then echo "$s/index.html"; fi; done)
           if [ -z "$files" ]; then echo "Nothing built"; exit 0; fi
           branch="$GITHUB_REF_NAME"
           for attempt in 1 2 3; do

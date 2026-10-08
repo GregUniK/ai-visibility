@@ -419,7 +419,10 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
     print(f"  {len(active)} active prompts, {len(inactive)} not active (left out)", flush=True)
     details = fetch_prompt_details(api, brand_id, [_pid(p) for p in active])
     missing = sum(1 for p in active if details.get(_pid(p)) is None)
-    if active and missing > max_failed_share * len(active):
+    if not active:
+        # An empty prompt list (an API hiccup, or a brand emptied by mistake) would publish a blank page.
+        raise ApiError(f"no active prompts ({len(listed)} listed); keeping the previous page")
+    if missing > max_failed_share * len(active):
         # Publishing a page with most runs missing would replace the last good one.
         raise ApiError(f"{missing} of {len(active)} prompt details failed; keeping the previous page")
 

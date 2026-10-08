@@ -194,6 +194,14 @@ def test_process_brand_applies_aliases_and_counts_a_name_once_per_answer():
                                "Younited Credit": ["Younited"]}
 
 
+def test_no_active_prompts_stops_the_build():
+    routes = brand_routes()
+    routes[f"/brands/{BID}/prompts"]["data"] = [p for p in routes[f"/brands/{BID}/prompts"]["data"]
+                                                if p["status"] != "active"]
+    with pytest.raises(bl.ApiError):
+        bl.process_brand(FakeAPI(routes), {"id": BID, "name": "Acme"})
+
+
 def test_most_prompt_details_failing_stops_the_build():
     routes = brand_routes()
     del routes[f"/brands/{BID}/prompts/p1"]
