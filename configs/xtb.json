@@ -1,4 +1,5 @@
 {
+  "report_title": "XTB AI Visibility Report",
   "brands": [
     {
       "id": "b53c7989-2961-452a-ae4f-b71348ad5b41",
@@ -6,7 +7,5 @@
       "key": "xtb",
       "domain": "xtb.com"
     }
-  ],
-  "report_title": "XTB AI Visibility Report",
-  "output_file": "xtb-report.html"
+  ]
 }

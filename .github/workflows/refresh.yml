@@ -1,5 +1,8 @@
 name: Refresh AI Visibility Reports
 
+# The live reports, <slug>/index.html for every config in configs/ (paused ones are
+# skipped and keep their page). Built by labs/tools/build_labs.py --live, the same
+# builder and template as the labs preview (labs.yml).
 on:
   schedule:
     - cron: '0 8 * * 1,4'   # Monday + Thursday, 8am UTC
@@ -9,45 +12,58 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
 
     steps:
-      - name: Checkout ai-visibility repo
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Clone build tools (always fresh from upstream)
-        run: git clone https://github.com/filipelinsduarte/ai-visibility-report build-tools
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-          cache: pip
-          cache-dependency-path: build-tools/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r build-tools/requirements.txt
+        run: pip install -r labs/tools/requirements.txt
+
+      - name: Test the builder
+        run: python -m pytest labs/tools -q -p no:cacheprovider
 
       - name: Build all clients
         env:
-          AIPEEKABOO_API_KEY:     ${{ secrets.AIPEEKABOO_API_KEY }}
-          AIPEEKABOO_API_KEY_ECI: ${{ secrets.AIPEEKABOO_API_KEY_ECI }}
-          AIPEEKABOO_API_KEY_LM:  ${{ secrets.AIPEEKABOO_API_KEY_LM }}
-        run: python .github/scripts/build_all.py
+          AIV_API_KEY:     ${{ secrets.AIPEEKABOO_API_KEY }}
+          AIV_API_KEY_ECI: ${{ secrets.AIPEEKABOO_API_KEY_ECI }}
+          AIV_API_KEY_LM:  ${{ secrets.AIPEEKABOO_API_KEY_LM }}
+        run: python labs/tools/build_labs.py --live --all
 
-      # Runs even when the build step failed, so reports that DID build still
-      # ship while the run itself stays red for the ones that didn't.
+      # Runs even when the build step failed, so reports that DID build still ship
+      # while the run itself stays red for the ones that didn't. Commits only the
+      # report pages, on top of the branch's latest commit (a labs run may have pushed
+      # meanwhile), and retries if the push is rejected.
       - name: Commit and push successful reports
         if: ${{ !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "No changes to commit" || \
-            (git commit -m "auto-refresh: $(date +%Y-%m-%d)" && git pull --rebase && git push)
+          files=$(for c in configs/*.json; do s=$(basename "$c" .json); [ -f "$s/index.html" ] && echo "$s/index.html"; done)
+          if [ -z "$files" ]; then echo "Nothing built"; exit 0; fi
+          branch="$GITHUB_REF_NAME"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin "$branch"
+            git reset --quiet --mixed "origin/$branch"
+            git add -- $files
+            if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+            git commit --quiet -m "auto-refresh: $(date +%Y-%m-%d)"
+            if git push origin "HEAD:$branch"; then exit 0; fi
+            echo "Push rejected (attempt $attempt), retrying"
+            sleep 5
+          done
+          exit 1
 
       - name: Notify on failure
         if: failure()

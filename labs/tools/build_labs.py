@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-build_labs.py: builds the labs AI visibility reports, the test version of the
-live reports at gregunik.github.io/ai-visibility/<slug>/.
+build_labs.py: builds the AI visibility reports.
 
-Output: labs/<slug>/index.html, served at /ai-visibility/labs/<slug>/.
-Production is untouched: configs/, .github/scripts/build_all.py and
-refresh.yml keep cloning the upstream template on their own schedule.
+  --live: configs/<slug>.json -> <slug>/index.html, the live reports at
+          gregunik.github.io/ai-visibility/<slug>/ (refresh.yml, Mon + Thu).
+  default: labs/configs/<slug>.json -> labs/<slug>/index.html, the labs preview
+          at /ai-visibility/labs/<slug>/ (labs.yml, on every builder change).
+Same code and template; the labs edition carries a "Labs" badge.
 
 Forked from filipelinsduarte/ai-visibility-report (build_fast.py and
 template.html at upstream commit 0202dea, 2026-07-16). What changed:
@@ -22,6 +23,7 @@ template.html at upstream commit 0202dea, 2026-07-16). What changed:
     prompts at the 100-run history cap, failed endpoints.
 
 Usage:
+  python labs/tools/build_labs.py --live --all
   python labs/tools/build_labs.py --all
   python labs/tools/build_labs.py --config labs/configs/credibom.json
   python labs/tools/build_labs.py --config ... --fixtures DIR --out FILE
@@ -888,11 +890,15 @@ def js(obj):
     return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c")
 
 
-def render(template_text, brands, title, D, DURL, DCAT, COMP, BRAND_CFG, RAW, LABS):
+LABS_BADGE = '<span class="labs-pill" title="Test version of this report.">Labs</span>'
+
+
+def render(template_text, brands, title, D, DURL, DCAT, COMP, BRAND_CFG, RAW, LABS, live=False):
     """Fill the template's placeholders in one pass, so data can't be mistaken for one."""
     import html as _html
     replacements = {
         "REPORT_TITLE": _html.escape(title), "BRAND_TOGGLE": brand_toggle_html(brands),
+        "EDITION_BADGE": "" if live else LABS_BADGE,
         "DATA": js(D), "DOMAIN_URLS": js(DURL), "DOMAIN_CATEGORIES": js(DCAT),
         "COMP_DOMAINS": js(COMP), "BRAND_CFG": js(BRAND_CFG),
         "DEFAULT_BRAND": brands[0]["key"], "RAW_HISTORY": js(RAW), "LABS": js(LABS),
@@ -903,7 +909,7 @@ def render(template_text, brands, title, D, DURL, DCAT, COMP, BRAND_CFG, RAW, LA
     return re.sub(r"%%([A-Z_]+)%%", lambda m: replacements[m.group(1)], template_text)
 
 
-def build_report(cfg, api, out_path, template_path=TEMPLATE):
+def build_report(cfg, api, out_path, template_path=TEMPLATE, live=False):
     brands = cfg["brands"]
     D = {"prompts": {}, "citations": {}, "competitors": {}, "sentiment": {}, "modelCitations": {}}
     DURL, DCAT, COMP, BRAND_CFG, RAW, LABS = {}, {}, {}, {}, {}, {}
@@ -965,9 +971,10 @@ def build_report(cfg, api, out_path, template_path=TEMPLATE):
             },
         }
 
-    title = cfg.get("report_title") or "AI Visibility Report (labs): " + " & ".join(b["name"] for b in brands)
+    names = " & ".join(b["name"] for b in brands)
+    title = cfg.get("report_title") or ("AI Visibility Report: " if live else "AI Visibility Report (labs): ") + names
     html = render(pathlib.Path(template_path).read_text(encoding="utf-8"), brands, title,
-                  D, DURL, DCAT, COMP, BRAND_CFG, RAW, LABS)
+                  D, DURL, DCAT, COMP, BRAND_CFG, RAW, LABS, live=live)
     out_path = pathlib.Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html, encoding="utf-8")
@@ -986,14 +993,17 @@ def _api_for(cfg, fixtures):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("--config", help="one labs config (JSON)")
-    ap.add_argument("--all", action="store_true", help="every config in labs/configs/")
-    ap.add_argument("--out", help="output HTML (default labs/<slug>/index.html)")
+    ap.add_argument("--config", help="one config (JSON)")
+    ap.add_argument("--all", action="store_true", help="every config in configs/ (--live) or labs/configs/")
+    ap.add_argument("--live", action="store_true",
+                    help="the live reports: configs/ -> <slug>/index.html, no Labs badge")
+    ap.add_argument("--out", help="output HTML (default <slug>/index.html, or labs/<slug>/index.html)")
     ap.add_argument("--fixtures", help="folder of saved API responses (no key needed)")
     args = ap.parse_args(argv)
 
+    root = LABS_DIR.parent if args.live else LABS_DIR  # the repo root, or labs/
     if args.all:
-        configs = sorted((LABS_DIR / "configs").glob("*.json"))
+        configs = sorted((root / "configs").glob("*.json"))
     elif args.config:
         configs = [pathlib.Path(args.config)]
     else:
@@ -1005,14 +1015,15 @@ def main(argv=None):
         if cfg.get("paused"):
             print(f"{path.stem}: paused, skipped ({cfg.get('paused_reason', 'no reason given')})")
             continue
-        out = pathlib.Path(args.out) if args.out and not args.all else LABS_DIR / path.stem / "index.html"
+        out = pathlib.Path(args.out) if args.out and not args.all else root / path.stem / "index.html"
         try:
-            build_report(cfg, _api_for(cfg, args.fixtures), out)
+            build_report(cfg, _api_for(cfg, args.fixtures), out, live=args.live)
         except Exception as e:  # one client's failure must not stop the others
             print(f"FAILED {path.stem}: {type(e).__name__}: {e}", flush=True)
             failures.append(path.stem)
     if failures:
-        sys.exit(f"{len(failures)} labs report(s) failed: {', '.join(failures)}")
+        kind = "live" if args.live else "labs"
+        sys.exit(f"{len(failures)} {kind} report(s) failed: {', '.join(failures)}")
 
 
 if __name__ == "__main__":

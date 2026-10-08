@@ -309,6 +309,29 @@ def test_render_escapes_data_and_fills_in_one_pass():
         bl.render(template + "%%ACTIONS%%", brands, "T", {}, {}, {}, {}, {}, {}, {})
 
 
+def test_live_edition_has_no_labs_badge():
+    template = "<header>%%EDITION_BADGE%%</header><title>%%REPORT_TITLE%%</title>"
+    brands = [{"key": "acme", "name": "Acme", "domain": "acme.pt"}]
+    labs = bl.render(template, brands, "T", {}, {}, {}, {}, {}, {}, {})
+    live = bl.render(template, brands, "T", {}, {}, {}, {}, {}, {}, {}, live=True)
+    assert ">Labs</span>" in labs and "Labs" not in live
+    assert "%%EDITION_BADGE%%" in bl.TEMPLATE.read_text(encoding="utf-8")
+
+
+def test_main_live_builds_configs_into_the_repo_root(tmp_path, monkeypatch):
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "labs").mkdir()
+    (tmp_path / "configs" / "a.json").write_text('{"brands": [{"id": "x", "name": "A", "key": "a", "domain": "a.pt"}]}',
+                                                  encoding="utf-8")
+    (tmp_path / "configs" / "p.json").write_text('{"paused": true, "brands": []}', encoding="utf-8")
+    monkeypatch.setattr(bl, "LABS_DIR", tmp_path / "labs")
+    monkeypatch.setattr(bl, "_api_for", lambda cfg, fixtures: None)
+    built = []
+    monkeypatch.setattr(bl, "build_report", lambda cfg, api, out, live=False: built.append((out, live)))
+    bl.main(["--live", "--all"])
+    assert built == [(tmp_path / "a" / "index.html", True)]
+
+
 def test_main_keeps_building_other_clients_when_one_fails(tmp_path, monkeypatch, capsys):
     configs = tmp_path / "configs"
     configs.mkdir()
@@ -318,7 +341,7 @@ def test_main_keeps_building_other_clients_when_one_fails(tmp_path, monkeypatch,
     monkeypatch.setattr(bl, "LABS_DIR", tmp_path)
     monkeypatch.delenv("NOT_SET_ANYWHERE", raising=False)
     built = []
-    monkeypatch.setattr(bl, "build_report", lambda cfg, api, out: built.append(out))
+    monkeypatch.setattr(bl, "build_report", lambda cfg, api, out, live=False: built.append(out))
     with pytest.raises(SystemExit) as exit_info:
         bl.main(["--all"])
     assert "1 labs report(s) failed: a" in str(exit_info.value)
