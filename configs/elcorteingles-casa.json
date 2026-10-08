@@ -1,5 +1,5 @@
 {
-  "api_key_env": "AIPEEKABOO_API_KEY_ECI",
+  "api_key_env": "AIV_API_KEY_ECI",
   "brands": [
     {
       "id": "8fd9c9fe-20d3-4e7c-a8bb-9523ff1308fb",
@@ -7,6 +7,5 @@
       "key": "elcorteingles_casa",
       "domain": "elcorteingles.pt"
     }
-  ],
-  "output_file": "elcorteingles-casa-report.html"
+  ]
 }

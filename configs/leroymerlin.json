@@ -1,7 +1,7 @@
 {
   "paused": true,
-  "paused_reason": "Analytics1 PeekaBoo account deleted (confirmed with Greg 2026-07-17); AIPEEKABOO_API_KEY_LM returns HTTP 403. Report stays published with data frozen at its last successful build. Un-pause by restoring the account, re-adding the AIPEEKABOO_API_KEY_LM secret and updating the id below.",
-  "api_key_env": "AIPEEKABOO_API_KEY_LM",
+  "paused_reason": "Analytics1 tracking account deleted (confirmed with Greg 2026-07-17); its API key returns HTTP 403. Report stays published with data frozen at its last successful build. The main key now sees a Leroy Merlin brand (5384ab32-17f2-4865-bc61-f4a4d16b3a6a, seen 2026-10-06): un-pause by swapping the id below and dropping api_key_env, once Greg confirms it is the same client and market.",
+  "api_key_env": "AIV_API_KEY_LM",
   "brands": [
     {
       "id": "532fae30-0f00-4a14-9730-e1906dc6a453",
@@ -9,6 +9,5 @@
       "key": "leroymerlin",
       "domain": "leroymerlin.pt"
     }
-  ],
-  "output_file": "leroymerlin-report.html"
+  ]
 }

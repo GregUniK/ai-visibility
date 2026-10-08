@@ -1,7 +1,7 @@
 name: Build labs reports
 
-# Test version of the AI visibility reports (labs/<slug>/index.html).
-# Production (refresh.yml + build_all.py) is separate and unchanged.
+# Labs preview of the AI visibility reports (labs/<slug>/index.html, Credibom only).
+# The live reports are built by refresh.yml with the same builder (--live).
 on:
   workflow_dispatch:
   push:

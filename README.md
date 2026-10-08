@@ -1,6 +1,6 @@
 # AI Visibility Reports — GregUniK
 
-Auto-refreshed PeekaBoo AI visibility reports published to GitHub Pages.
+Auto-refreshed AI visibility reports published to GitHub Pages.
 
 **Live reports:** `https://gregunik.github.io/ai-visibility/<client>/`
 
@@ -10,7 +10,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 |---|---|---|
 | Adelante | https://gregunik.github.io/ai-visibility/adelante/ | ✅ auto |
 | Beyond Legal | https://gregunik.github.io/ai-visibility/beyond-legal/ | ✅ auto |
-| CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from PeekaBoo |
+| CoinsBee | https://gregunik.github.io/ai-visibility/coinsbee/ | ⏸ paused — brand deleted from the tracking platform |
 | Credibom | https://gregunik.github.io/ai-visibility/credibom/ | ✅ auto |
 | El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ✅ auto |
 | El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ✅ auto |
@@ -19,22 +19,29 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
 | The Tool Ranch | https://gregunik.github.io/ai-visibility/toolranch/ | ✅ auto |
 | UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
-| Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from PeekaBoo |
+| Visitmadeira | https://gregunik.github.io/ai-visibility/visitmadeira/ | ⏸ paused — brand deleted from the tracking platform |
 | Vortal (Portugal) | https://gregunik.github.io/ai-visibility/vortal-pt/ | ✅ auto |
 | Vortal (España) | https://gregunik.github.io/ai-visibility/vortal-es/ | ✅ auto |
 | WiZink (Portugal) | https://gregunik.github.io/ai-visibility/wizink-pt/ | ✅ auto |
 | WiZink (España) | https://gregunik.github.io/ai-visibility/wizink-es/ | ✅ auto |
 | XTB | https://gregunik.github.io/ai-visibility/xtb/ | ✅ auto |
 
-Status as of 2026-08-02 — all 12 active clients building green. A ⚠️ client keeps serving its last good report; the run goes red until it's fixed.
+A failing client keeps serving its last good report; the run goes red and opens an issue until it's fixed.
 
 ---
 
 ## How it works
 
-- **Schedule:** auto-refreshes every Monday + Thursday at 8am UTC
-- **Template:** always cloned fresh from https://github.com/filipelinsduarte/ai-visibility-report — any upstream layout update is picked up automatically
-- **Zero LLM tokens:** NLP and action generation are disabled (`skip_nlp: true`). Only PeekaBoo API calls are made.
+- **Schedule:** `.github/workflows/refresh.yml` rebuilds every Monday + Thursday at 8am UTC.
+- **Builder:** `labs/tools/build_labs.py --live --all` with `labs/tools/template.html`, our own
+  code (no template cloned from elsewhere). Tabs: Overview (with the official visibility scores),
+  Prompts, Fan-out searches, Sentiment, Competitors, Citations, plus data notes.
+- **Zero LLM tokens:** only tracking-API calls. A full refresh is about 1,070 calls on the main
+  account and 1,014 on the El Corte Inglés account; the main account allows about 2,000 a day.
+- **Labs** (`labs/`, see `labs/README.md`) is the preview: a change to the builder rebuilds the
+  Credibom labs page at /ai-visibility/labs/credibom/ straight away; the live reports pick it up
+  at the next refresh. To check every client before merging, run **Refresh AI Visibility
+  Reports** on the PR branch: it commits the built pages to that branch, not to `main`.
 
 ---
 
@@ -53,22 +60,19 @@ https://github.com/GregUniK/ai-visibility/actions/workflows/refresh.yml
 {
   "brands": [
     {
-      "id": "<uuid-from-peekaboo-dashboard>",
+      "id": "<brand-uuid-from-the-tracking-dashboard>",
       "name": "Brand Name",
       "key": "brandkey",
       "domain": "brand.com"
     }
-  ],
-  "output_file": "<slug>-report.html"
+  ]
 }
 ```
-If the brand is under a non-default PeekaBoo account, add `"api_key_env": "AIPEEKABOO_API_KEY_XXX"` and set that secret in GitHub.
+If the brand is under a non-default tracking account, add `"api_key_env": "AIV_API_KEY_XXX"`, add
+that secret in GitHub and map it in the `Build all clients` step of `refresh.yml`.
 
-2. Create `stubs/<slug>.json` containing just `[]`
-
-3. Commit and push — the next workflow run picks it up automatically.
-
-The report will be live at `https://gregunik.github.io/ai-visibility/<slug>/`
+2. Commit and push — the next run picks it up. The report goes live at
+`https://gregunik.github.io/ai-visibility/<slug>/`; add a card to `tasks/index.html` once it is.
 
 ---
 
@@ -84,19 +88,19 @@ Add `"paused": true` and a `"paused_reason"` to `configs/<slug>.json`:
 ```json
 {
   "paused": true,
-  "paused_reason": "Brand deleted from PeekaBoo (API 404, confirmed 2026-07-17).",
+  "paused_reason": "Brand deleted from the tracking platform (API 404, confirmed 2026-07-17).",
   "brands": [ ... ]
 }
 ```
 The client is skipped at build time and **does not count as a failure**, so the run stays green. The published `<slug>/index.html` is left untouched and keeps serving its last good data.
 
-Use this when a brand disappears from PeekaBoo but the report should stay online. Without it, the client fails on every run and the red build stops meaning anything.
+Use this when a brand disappears from the tracking platform but the report should stay online. Without it, the client fails on every run and the red build stops meaning anything.
 
 ---
 
 ## Add a brand to an existing report (multi-brand)
 
-Add another object to the `brands` array in the config. Example — El Corte Inglés has two brands (Casa + Sports) in one report:
+Add another object to the `brands` array in the config; the report gets a brand switch:
 ```json
 {
   "brands": [
@@ -108,47 +112,28 @@ Add another object to the `brands` array in the config. Example — El Corte Ing
 
 ---
 
-## PeekaBoo accounts & GitHub secrets
+## Tracking accounts & API keys
 
-Three PeekaBoo accounts are in use. Secrets are stored in:
+Three tracking accounts are in use. The builder reads each client's key from the environment
+variable named by its config (`api_key_env`, default `AIV_API_KEY`); `refresh.yml` and `labs.yml`
+fill those variables from the repository secrets:
 **https://github.com/GregUniK/ai-visibility/settings/secrets/actions**
 
-| Secret name | Account | Used by |
+| Variable | Account | Used by |
 |---|---|---|
-| `AIPEEKABOO_API_KEY` | analytics@unik-seo.com (main) | coinsbee*, credibom, era, reduniq, unikseo, visitmadeira*, wizink-pt, wizink-es, xtb |
-| `AIPEEKABOO_API_KEY_ECI` | Analytics2 | elcorteingles-casa, elcorteingles-sport |
-| `AIPEEKABOO_API_KEY_LM` | Analytics1 — **account deleted 2026-07** | leroymerlin* |
+| `AIV_API_KEY` | analytics@unik-seo.com (main) | every client without `api_key_env` (coinsbee* and visitmadeira* paused) |
+| `AIV_API_KEY_ECI` | Analytics2 | elcorteingles-casa, elcorteingles-sport |
+| `AIV_API_KEY_LM` | Analytics1 — **account deleted 2026-07** | leroymerlin* |
 
 \* paused — see the status table at the top.
 
-`build_all.py` prints every brand each key can actually see, with ids, at the start of
-every run. Read that block first when a client starts failing:
-```
-AIPEEKABOO_API_KEY_ECI: 2 brand(s)
-    8fd9c9fe-20d3-4e7c-a8bb-9523ff1308fb  El Corte Inglés (Casa)
-    b2172ee8-0472-43b2-9b0c-7b575a6061bb  El Corte Inglés
-AIPEEKABOO_API_KEY_LM: HTTP 403 — Forbidden
-```
-Triage:
-- **`HTTP 403` on a key** → key or its subscription/account is dead. Account-side fix.
-- **Brand absent from the list** → deleted from PeekaBoo. Pause the client.
-- **Brand listed with the same id as the config, but the build still 404s on it** →
-  the build used the *wrong key*, not a bad id. On a failure, build_all.py's
-  `diagnose()` re-hits `/prompts` with the resolved key: if that probe returns 200
-  while the build 404'd, the build sent a different key. See the note below.
-
-> **Non-main accounts and the `AIPEEKABOO_API_KEY` override.** build_fast.py's
-> `load_config()` overrides the config's api key with the `AIPEEKABOO_API_KEY` env var
-> whenever it is set. build_all.py works around this by setting that env var, per
-> subprocess, to each client's resolved key. If a non-main client (ECI, or a future
-> `_LM`) suddenly 404s across the board after an upstream template change, check that
-> this per-client env override in build_all.py is still in place — losing it makes
-> every client build with the main key, so only non-main accounts break.
-
-A brand's id is also visible in its share link: open the share URL and the `brandId`
-is in the page source (`GET /brands` with the key is the more direct route).
-
-To find brand UUIDs: open the brand in the PeekaBoo dashboard — the UUID is in the URL. Or call `GET https://www.aipeekaboo.com/api/v1/brands` with `X-API-Key: pk_...`
+Triage when a client fails (the run log names it, with the API's error):
+- **`HTTP 403`** → the key or its account is dead. Account-side fix.
+- **`HTTP 404` on the brand** → deleted from the tracking platform, or the config points at the
+  wrong account. Check the brand id in the tracking dashboard (it is in the brand's URL), then fix
+  `api_key_env` or pause the client.
+- **Most prompt details failing** → the builder stops that client on purpose so a half-empty page
+  doesn't replace the last good one; the others still build.
 
 ---
 
@@ -156,11 +141,11 @@ To find brand UUIDs: open the brand in the PeekaBoo dashboard — the UUID is in
 
 ```
 configs/          ← one JSON per client (no API keys stored here)
-stubs/            ← empty [] files, one per client (skip LLM action generation)
 <slug>/           ← built HTML reports committed here, served via GitHub Pages
+tasks/index.html  ← hand-maintained index of the reports
+labs/             ← the builder (labs/tools/), its tests, and the labs preview
 .github/
   workflows/
-    refresh.yml   ← scheduled + manual trigger
-  scripts/
-    build_all.py  ← auto-discovers clients from configs/, patches upstream build tool
+    refresh.yml   ← the live reports, Mon + Thu + manual
+    labs.yml      ← the labs preview, on every builder change + manual
 ```
