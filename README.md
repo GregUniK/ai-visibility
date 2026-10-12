@@ -15,7 +15,7 @@ Index of all reports: https://gregunik.github.io/ai-visibility/tasks/
 | El Corte Inglés (Casa) | https://gregunik.github.io/ai-visibility/elcorteingles-casa/ | ✅ auto |
 | El Corte Inglés (Sport) | https://gregunik.github.io/ai-visibility/elcorteingles-sport/ | ✅ auto |
 | ERA Imobiliária | https://gregunik.github.io/ai-visibility/era/ | ✅ auto |
-| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ⏸ paused — Analytics1 account deleted |
+| Leroy Merlin | https://gregunik.github.io/ai-visibility/leroymerlin/ | ✅ auto (main account since 2026-10-12) |
 | REDUNIQ | https://gregunik.github.io/ai-visibility/reduniq/ | ✅ auto |
 | The Tool Ranch | https://gregunik.github.io/ai-visibility/toolranch/ | ✅ auto |
 | UniK SEO | https://gregunik.github.io/ai-visibility/unikseo/ | ✅ auto |
@@ -123,7 +123,7 @@ fill those variables from the repository secrets:
 |---|---|---|
 | `AIV_API_KEY` | analytics@unik-seo.com (main) | every client without `api_key_env` (coinsbee* and visitmadeira* paused) |
 | `AIV_API_KEY_ECI` | Analytics2 | elcorteingles-casa, elcorteingles-sport |
-| `AIV_API_KEY_LM` | Analytics1 — **account deleted 2026-07** | leroymerlin* |
+| `AIV_API_KEY_LM` | Analytics1 — **account deleted 2026-07** | nothing (leroymerlin moved to the main account 2026-10-12) |
 
 \* paused — see the status table at the top.
 
