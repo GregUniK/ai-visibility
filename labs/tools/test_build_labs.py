@@ -354,3 +354,25 @@ def test_main_keeps_building_other_clients_when_one_fails(tmp_path, monkeypatch,
         bl.main(["--all"])
     assert "1 labs report(s) failed: a" in str(exit_info.value)
     assert "b: paused" in capsys.readouterr().out and built == []
+
+
+def test_citation_types_are_counted_per_citation_like_the_page_filters_do():
+    # the same URL cited under different titles can classify differently; the totals must equal a
+    # recount of the raw entries, or "All data" and a range covering every run disagree
+    routes = brand_routes()
+    history = routes[f"/brands/{BID}/prompts/p1"]["data"]["history"]
+    for e, title in zip(history, ["Best loans: top 10 compared", "Loans", "Top 5 lenders ranked"]):
+        e["sources"] = [{"url": "https://x.pt/a", "title": title}]
+    data = bl.process_brand(FakeAPI(routes), {"id": BID, "name": "Credibom"}, [], {})
+    counts = {"pt": {}, "ct": {}}
+    for p in data["raw_history"]["prompts"]:
+        for e in p["entries"]:
+            for s in e["srcs"]:
+                for k in counts:
+                    counts[k][s[k]] = counts[k].get(s[k], 0) + 1
+    got_ct = {x["type"]: x["count"] for x in data["citations"]["contentTypes"]}
+    got_pt = {x["type"]: x["count"] for x in data["citations"]["domainTypes"]}
+    assert got_ct == counts["ct"] and got_pt == counts["pt"]
+    assert len(got_ct) > 1  # the titles really do classify differently
+    model_ct = {x["type"]: x["count"] for x in data["modelCitations"]["gpt-4o-mini"]["contentTypes"]}
+    assert model_ct == counts["ct"]
