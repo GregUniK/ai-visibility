@@ -629,7 +629,7 @@ function _computeFilteredData(brandKey){
   var totalCit=Object.values(urlData).reduce(function(a,x){return a+x.count;},0);
   var origCit=D_ORIG.citations[bk];
   /* Use actual page/content type counts from filtered data; fall back to proportional scaling if pt/ct not in raw data */
-  var hasPtCt=rh.prompts.length>0&&rh.prompts[0].entries.length>0&&'pt' in (rh.prompts[0].entries[0].srcs||[{}])[0];
+  var hasPtCt=rh.prompts.length>0&&rh.prompts[0].entries.length>0&&'pt' in ((rh.prompts[0].entries[0].srcs||[])[0]||{});
   var domainTypesArr,contentTypesArr;
   if(hasPtCt||Object.keys(domainTypeCounts).length>0){
     domainTypesArr=Object.keys(domainTypeCounts).map(function(t){return {type:t,count:domainTypeCounts[t]};}).sort(function(a,b){return b.count-a.count;});
@@ -689,7 +689,9 @@ function _computeFilteredData(brandKey){
 
 function _applyTimeRange(){
   var bk=BRAND_CFG[currentBrand].key;
-  if(currentTimeRange==='all'){
+  /* a frozen one-off report (labs.static) was built by an older builder whose totals differ a little
+     from its own answers, so "All data" is recounted from the answers like every other range */
+  if(currentTimeRange==='all'&&!_labs().static){
     D.prompts[bk]=D_ORIG.prompts[bk];
     D.citations[bk]=D_ORIG.citations[bk];
     D.competitors[bk]=D_ORIG.competitors[bk];
@@ -889,9 +891,9 @@ function _buildIntentCitationsRaw(bk){
       if(activeModel!=='all'&&e.model!==activeModel)return;
       (e.srcs||[]).forEach(function(src){
         if(!src||!src.u)return;
-        var dom;
-        try{dom=new URL(src.u).hostname.replace(/^www\./,'');}catch(err){return;}
-        domainCounts[dom]=(domainCounts[dom]||0)+1;
+        var dom=null; /* a citation whose URL can't be read still counts in the totals and types, just not under a domain */
+        try{dom=new URL(src.u).hostname.replace(/^www\./,'');}catch(err){}
+        if(dom)domainCounts[dom]=(domainCounts[dom]||0)+1;
         if(src.pt)typeCounts[src.pt]=(typeCounts[src.pt]||0)+1;
         if(src.ct)contentCounts[src.ct]=(contentCounts[src.ct]||0)+1;
         total++;
