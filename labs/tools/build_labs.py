@@ -493,8 +493,8 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
                 if not url:
                     continue
                 title = src.get("title") or urlparse(url).path or url
-                all_citations.append((url, title, model_key))
                 pt, ct = classify_url(url, extract_domain(url), title)
+                all_citations.append((url, title, model_key, pt, ct))
                 raw_srcs.append({"u": url, "t": title[:100], "pt": pt, "ct": ct})
 
             for name in answer_comps:
@@ -520,7 +520,7 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
 
     # ── Citations ──
     url_data = {}
-    for url, title, model_key in all_citations:
+    for url, title, model_key, _pt, _ct in all_citations:
         info = url_data.setdefault(url, {"title": title, "count": 0, "models": set(), "mc": defaultdict(int)})
         info["count"] += 1
         info["models"].add(model_key)
@@ -535,11 +535,16 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
         url_cache[url] = (domain, dt, ct)
         domain_counts[domain] += info["count"]
         dcat[domain] = classify_domain(domain)
-        domain_type_counts[dt] += info["count"]
-        content_type_counts[ct] += info["count"]
         domain_url_list[domain].append({"url": url, "title": info["title"], "count": info["count"],
                                         "models": sorted(info["models"]), "mc": dict(info["mc"]),
                                         "pageType": dt, "contentType": ct})
+
+    # Page/content types are counted per citation with that citation's own title, the same way
+    # the in-page filters recount them, so "All data" and a date range covering every run agree
+    # (classifying each URL once from the first title seen made them differ by a few percent).
+    for _url, _title, _mk, _pt, _ct in all_citations:
+        domain_type_counts[_pt] += 1
+        content_type_counts[_ct] += 1
 
     by_count = lambda d: sorted(d.items(), key=lambda x: -x[1])
     top_listicles = sorted(
@@ -566,8 +571,8 @@ def process_brand(api, brand, tracked_names=(), tracked_ids=None, max_failed_sha
     # ── Citations per model ──
     model_cit = defaultdict(lambda: {"total": 0, "domains": defaultdict(int),
                                      "domain_types": defaultdict(int), "content_types": defaultdict(int)})
-    for url, title, model_key in all_citations:
-        domain, dt, ct = url_cache[url]
+    for url, title, model_key, dt, ct in all_citations:
+        domain = url_cache[url][0]
         mc = model_cit[model_key]
         mc["total"] += 1
         mc["domains"][domain] += 1

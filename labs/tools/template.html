@@ -871,7 +871,13 @@ function _buildIntentFilteredComps(bk){
   return Object.values(compMap).sort(function(a,b){return b.mentions-a.mentions;});
 }
 /* rebuild citation aggregates (domains/page types/content types) from RAW_HISTORY filtered by current intentFilter+model */
+var _citMemo={key:null,val:null};
 function _buildIntentCitations(bk){
+  var _mk=[currentBrand,currentTimeRange,customStartDate,customEndDate,activeModel,intentFilter,topicFilter].join('|');
+  if(_citMemo.key===_mk)return _citMemo.val;
+  var _v=_buildIntentCitationsRaw(bk);_citMemo={key:_mk,val:_v};return _v;
+}
+function _buildIntentCitationsRaw(bk){
   var rh=RAW_HISTORY[currentBrand];
   var fallbackListicles=(D.citations[bk]||{}).topListicles||[];
   if(!rh)return{total:0,uniqueDomains:0,domainTypes:[],contentTypes:[],topDomains:[],topListicles:fallbackListicles};
@@ -942,7 +948,7 @@ function renderOverview(){
       rp.entries.filter(function(e){return inRangeDates.indexOf(e.date)>-1&&(activeModel==='all'||e.model===activeModel);}).forEach(function(e){
         dayTotals[e.date]=(dayTotals[e.date]||0)+1;
         if(e.hit)dayBrandHits[e.date]=(dayBrandHits[e.date]||0)+1;
-        top5comps.forEach(function(c){if((e.comps||[]).indexOf(c.name)>-1)dayCompHits[c.name][e.date]=(dayCompHits[c.name][e.date]||0)+1;});
+        top5comps.forEach(function(c){if((e.comps||[]).some(function(n){return _normComp(n)===_normComp(c.name);}))dayCompHits[c.name][e.date]=(dayCompHits[c.name][e.date]||0)+1;});
       });
     });
   }
@@ -951,7 +957,15 @@ function renderOverview(){
   /* labs: chart the official score per run (brand + every tracked competitor) when available;
      the mention-rate series above stays as the fallback */
   var chartLabels=inRangeDates.map(function(d){return d.slice(5);}),chartBrand=brandVis,chartComps=compVisSeries,chartMax=100,_visUnit='%';
-  var _ts=_official().timeseries,_officialChart=!!(_ts&&_ts.brand&&(_ts.brand.series||[]).length);
+  var _ts=_official().timeseries,_officialAvail=!!(_ts&&_ts.brand&&(_ts.brand.series||[]).length);
+  /* the official score is one number per run for all models and prompts, so it can't follow the
+     model, intent and topic filters: with one on, chart the share of answers that name each brand instead */
+  var _filtersOn=activeModel!=='all'||intentFilter!=='all'||topicFilter!=='all';
+  var _officialChart=_officialAvail&&!_filtersOn;
+  if(_officialAvail&&_filtersOn){
+    var _vv=chartBrand.concat.apply(chartBrand,chartComps.map(function(c){return c.data;})).filter(function(v){return v!==null&&v!==undefined;});
+    chartMax=Math.min(100,Math.max(10,Math.ceil(Math.max.apply(null,_vv.concat([0]))*1.2/5)*5));
+  }
   if(_officialChart){
     var _inR=_rangeFn();
     var _toMap=function(series){var m={};(series||[]).forEach(function(p){m[p.date]=p.score;});return m;};
@@ -976,24 +990,19 @@ function renderOverview(){
   }
 
   /* ── Sentiment ──────────────────────────────────────────────────────── */
-  var sMentions=activeModel==='all'?s.mentions:s.mentions.filter(function(m){return m.model===activeModel;});
+  /* labs: intent and topic apply here too (sentiment mentions carry the prompt text) */
+  var _sentTexts=_intentPromptTexts(bk);
+  var sMentions=s.mentions;
+  if(_sentTexts)sMentions=sMentions.filter(function(m){return _sentTexts.has(m.prompt);});
+  if(activeModel!=='all')sMentions=sMentions.filter(function(m){return m.model===activeModel;});
   var sentCounts={positive:0,neutral:0,negative:0,uncertain:0};
   sMentions.forEach(function(m){if(sentCounts.hasOwnProperty(m.sentiment))sentCounts[m.sentiment]++;});
 
   /* ── Model-filtered citations ───────────────────────────────────────── */
-  var activeCit=cit;
-  if(activeModel!=='all'&&D.modelCitations&&D.modelCitations[bk]&&D.modelCitations[bk][activeModel]){
-    var mc=D.modelCitations[bk][activeModel];
-    activeCit={
-      total:mc.total||cit.total,
-      uniqueUrls:cit.uniqueUrls,
-      uniqueDomains:mc.uniqueDomains||cit.uniqueDomains,
-      domainTypes:(mc.domainTypes&&mc.domainTypes.length)?mc.domainTypes:cit.domainTypes,
-      contentTypes:(mc.contentTypes&&mc.contentTypes.length)?mc.contentTypes:cit.contentTypes,
-      topDomains:(mc.topDomains&&mc.topDomains.length)?mc.topDomains:cit.topDomains,
-      topListicles:cit.topListicles,
-    };
-  }
+  /* labs: recounted from the raw answers so time range, model, intent and topic all apply, and
+     "All data" matches a range that covers every run (the build-time totals and the model
+     fallback this replaces ignored intent/topic, or fell back to every model's data) */
+  var activeCit=_buildIntentCitations(bk);
 
   /* ── Content & page types ───────────────────────────────────────────── */
   var ct=activeCit.contentTypes.slice(0,6);
@@ -1002,6 +1011,8 @@ function renderOverview(){
   var dt=activeCit.domainTypes.slice(0,6);
   var dtLabels=dt.map(function(x){return x.type.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});});
   var dtData=dt.map(function(x){return x.count;});
+
+  function _donutBody(id,n){return n>0?'<div class="cc-body" style="height:210px;position:relative"><canvas id="'+id+'"></canvas></div>':'<div class="cc-body" style="height:210px;display:flex;align-items:center;justify-content:center"><p style="color:var(--ink4);font-size:12px">No data for these filters.</p></div>';}
 
   /* ── Bar helper ─────────────────────────────────────────────────────── */
   function ovBars(items,maxVal,fillClass){
@@ -1028,6 +1039,7 @@ function renderOverview(){
   var otherMax=other8[0]?(activeModel!=='all'?(other8[0].modelMentions||0):other8[0].mentions):1;if(!otherMax)otherMax=1;
   var otherItems=other8.map(function(c){var v=activeModel!=='all'?(c.modelMentions||0):c.mentions;return {icon:_compDomain(c.name),label:c.name,val:v,sub:v+' mentions'};});
   var _brandDomOv=BRAND_CFG[currentBrand].url||'';
+  if(brandMentionCount>compMax)compMax=brandMentionCount; /* one scale for the brand and the competitor bars */
   var _brandPctOv=compMax>0?Math.round(brandMentionCount/compMax*100):0;
   var _brandOvRow='<div class="ov-bar-row" style="background:rgba(79,70,229,.06);padding:6px 0;border-top:1.5px dashed rgba(79,70,229,.3);border-bottom:none"><div class="ov-bar-lbl" style="color:#4f46e5;font-weight:700"><img src="'+fav(_brandDomOv)+'" onerror="this.style.opacity=\'0\'" alt=""><span>You ('+brandName+')</span></div><div class="ov-bar-track"><div class="ov-bar-fill" style="width:'+_brandPctOv+'%;background:rgba(79,70,229,.85)"></div></div><div class="ov-bar-val" style="color:#4f46e5;font-weight:700">'+brandMentionCount+' mentions</div></div>';
 
@@ -1037,19 +1049,20 @@ function renderOverview(){
 
   /* ── Render HTML ────────────────────────────────────────────────────── */
   var _modelPrefix=activeModel!=='all'?(MODEL_META[activeModel]||{label:activeModel}).label+' &middot; ':'';
-  var _filtersOn=activeModel!=='all'||intentFilter!=='all'||topicFilter!=='all';
-  var visTitle=_officialChart?'Visibility score over time':'Visibility Over Time';
+  var visTitle=_officialChart?'Visibility score over time':(_officialAvail?'Mention rate over time':'Visibility Over Time');
   var visSubtitle=_officialChart
-    ?esc(brandName)+' vs tracked competitors &middot; visibility score (0–100) per run, all models and prompts'+(_filtersOn?' (the model, intent and topic filters don’t apply)':'')
-    :brandName+' vs top competitors &middot; '+(isLastRun?'last run snapshot':inRangeDates.length+' data points');
+    ?esc(brandName)+' vs tracked competitors &middot; visibility score (0–100) per run, all models and prompts'
+    :(_officialAvail
+      ?esc(brandName)+' vs tracked competitors &middot; share of the filtered AI answers that name each brand, per run (the official score only exists for all models and prompts)'
+      :esc(brandName)+' vs top competitors &middot; '+(isLastRun?'last run snapshot':inRangeDates.length+' data points'));
   var visCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">'+visTitle+'</div><div class="cc-sub">'+visSubtitle+'</div></div></div><div class="cc-body" style="height:260px;position:relative"><canvas id="ov-vis"></canvas></div><div id="ov-vis-legend" style="display:flex;flex-wrap:wrap;gap:8px 14px;padding:8px 14px 4px;border-top:1px solid var(--border)"></div></div>';
   var compCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">'+(_split?'Tracked competitors':'Competitor Mentions')+'</div><div class="cc-sub">'+_modelPrefix+(_split?'mentions in AI answers':'top 8 by mention count')+'</div></div></div><div class="cc-body"><div class="ov-bar-wrap">'+(compItems.length?ovBars(compItems,compMax,'ov-green'):'<p style="color:var(--ink4);font-size:12px;padding:6px 0">No tracked competitor mentioned for this filter.</p>')+_brandOvRow+'</div></div></div>';
   var alsoCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Also named by the AIs</div><div class="cc-sub">'+_modelPrefix+'not tracked: regulators, comparison sites, other brands</div></div></div><div class="cc-body"><div class="ov-bar-wrap">'+(otherItems.length?ovBars(otherItems,otherMax,'ov-violet'):'<p style="color:var(--ink4);font-size:12px;padding:6px 0">No other names for this filter.</p>')+'</div></div></div>';
-  var sentCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Sentiment Breakdown</div><div class="cc-sub">'+sMentions.length+' brand mention'+(sMentions.length!==1?'s':'')+' analysed</div></div></div><div class="cc-body" style="height:210px;position:relative"><canvas id="ov-sent"></canvas></div></div>';
+  var sentCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Sentiment Breakdown</div><div class="cc-sub">'+sMentions.length+' brand mention'+(sMentions.length!==1?'s':'')+' analysed</div></div></div>'+_donutBody('ov-sent',sMentions.length)+'</div>';
   var covCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Model Coverage</div><div class="cc-sub">prompts where the latest answer of each AI model mentions the brand</div></div></div><div class="cc-body"><div class="ov-bar-wrap">'+ovBars(covItemsFiltered,covMax,'ov-indigo')+'</div></div></div>';
-  var ctCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Content Type Distribution</div><div class="cc-sub">how AI citation sources are classified</div></div></div><div class="cc-body" style="height:210px;position:relative"><canvas id="ov-ct"></canvas></div></div>';
-  var dtCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Page Type Distribution</div><div class="cc-sub">structure of pages AI models cite most</div></div></div><div class="cc-body" style="height:210px;position:relative"><canvas id="ov-dt"></canvas></div></div>';
-  var domCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Top Cited Domains</div><div class="cc-sub">leading citation sources</div></div></div><div class="cc-body"><div class="ov-bar-wrap">'+ovBars(domItems,domMax,'ov-violet')+'</div></div></div>';
+  var ctCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Content Type Distribution</div><div class="cc-sub">how AI citation sources are classified</div></div></div>'+_donutBody('ov-ct',ctData.length)+'</div>';
+  var dtCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Page Type Distribution</div><div class="cc-sub">structure of pages AI models cite most</div></div></div>'+_donutBody('ov-dt',dtData.length)+'</div>';
+  var domCard='<div class="cc"><div class="cc-head"><div><div class="cc-title">Top Cited Domains</div><div class="cc-sub">leading citation sources</div></div></div><div class="cc-body"><div class="ov-bar-wrap">'+(domItems.length?ovBars(domItems,domMax,'ov-violet'):'<p style="color:var(--ink4);font-size:12px;padding:6px 0">No citations for these filters.</p>')+'</div></div></div>';
   function _row(a,b){return '<div class="two-col" style="margin-bottom:14px">'+a+b+'</div>';}
   document.getElementById('ovContent').innerHTML=_labsCardsHtml()+
     _row(visCard,compCard)+
@@ -1093,15 +1106,15 @@ function renderOverview(){
   if(visLegend){var brandDomain=BRAND_CFG[currentBrand].url||'';var legendItems=[{label:brandName,domain:brandDomain,color:visColors[0]}];chartComps.forEach(function(c,ci){legendItems.push({label:c.name,domain:_compDomain(c.name),color:visColors[(ci+1)%visColors.length]});});visLegend.innerHTML=legendItems.map(function(item){return '<div style="display:flex;align-items:center;gap:5px"><div style="width:20px;height:2px;background:'+item.color+';flex-shrink:0"></div><img src="'+fav(item.domain)+'" style="width:14px;height:14px;border-radius:3px;border:1px solid #e5e7eb;flex-shrink:0" onerror="this.style.display=\'none\'"><span style="font-size:11px;color:#374151;white-space:nowrap">'+item.label+'</span></div>';}).join('');}
 
   /* ── Sentiment donut ────────────────────────────────────────────────── */
-  _ovCharts.sent=new Chart(document.getElementById('ov-sent'),{type:'doughnut',data:{labels:['Positive','Neutral','Negative','Uncertain'],datasets:[{data:[sentCounts.positive,sentCounts.neutral,sentCounts.negative,sentCounts.uncertain],backgroundColor:['#22c55e','#94a3b8','#ef4444','#f59e0b'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:10}},tooltip:_donutTooltipCb}}});
+  if(document.getElementById('ov-sent'))_ovCharts.sent=new Chart(document.getElementById('ov-sent'),{type:'doughnut',data:{labels:['Positive','Neutral','Negative','Uncertain'],datasets:[{data:[sentCounts.positive,sentCounts.neutral,sentCounts.negative,sentCounts.uncertain],backgroundColor:['#22c55e','#94a3b8','#ef4444','#f59e0b'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:10}},tooltip:_donutTooltipCb}}});
 
   /* ── Content type donut ─────────────────────────────────────────────── */
   var ctColors=['#6366f1','#8b5cf6','#ec4899','#f43f5e','#f97316','#eab308'];
-  _ovCharts.ct=new Chart(document.getElementById('ov-ct'),{type:'doughnut',data:{labels:ctLabels,datasets:[{data:ctData,backgroundColor:ctColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:8}},tooltip:_donutTooltipCb}}});
+  if(document.getElementById('ov-ct'))_ovCharts.ct=new Chart(document.getElementById('ov-ct'),{type:'doughnut',data:{labels:ctLabels,datasets:[{data:ctData,backgroundColor:ctColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:8}},tooltip:_donutTooltipCb}}});
 
   /* ── Page type donut ────────────────────────────────────────────────── */
   var dtColors=['#3b82f6','#06b6d4','#10b981','#84cc16','#f59e0b','#f97316'];
-  _ovCharts.dt=new Chart(document.getElementById('ov-dt'),{type:'doughnut',data:{labels:dtLabels,datasets:[{data:dtData,backgroundColor:dtColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:8}},tooltip:_donutTooltipCb}}});
+  if(document.getElementById('ov-dt'))_ovCharts.dt=new Chart(document.getElementById('ov-dt'),{type:'doughnut',data:{labels:dtLabels,datasets:[{data:dtData,backgroundColor:dtColors,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:baseFont,boxWidth:12,padding:8}},tooltip:_donutTooltipCb}}});
 }
 /* stats */
 function renderStats(){
@@ -1135,7 +1148,7 @@ function renderStats(){
     if(bsm)bestScoreModel=(MODEL_META[bsm]||{label:bsm}).label;
   }
   var c=D.citations[bk];
-  var citTotal=activeModel!=='all'&&D.modelCitations&&D.modelCitations[bk]&&D.modelCitations[bk][activeModel]?D.modelCitations[bk][activeModel].total:c.total;
+  var citTotal=_buildIntentCitations(bk).total;
   /* sentiment score */
   var s=D.sentiment[bk];
   var sMentions=activeModel==='all'?s.mentions:s.mentions.filter(function(m){return m.model===activeModel;});
@@ -1699,14 +1712,8 @@ function _buildBrandCits(bk){
 function _barRows(items,total){return items.map(function(x){var pct=total>0?(x.count/total*100).toFixed(1):0;var lbl=x.type.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});return '<div class="bar-row"><div class="bar-label">'+lbl+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="bar-val">'+x.count+'</div></div>';}).join('');}
 function renderCitations(){
   var bk=BRAND_CFG[currentBrand].key,c;
-  /* base citation data */
-  if(intentFilter!=='all'||topicFilter!=='all'){
-    c=_buildIntentCitations(bk);
-  } else if(activeModel!=='all'&&D.modelCitations&&D.modelCitations[bk]&&D.modelCitations[bk][activeModel]){
-    c=Object.assign({},D.modelCitations[bk][activeModel]);
-    c.uniqueDomains=c.topDomains?c.topDomains.length:D.citations[bk].uniqueDomains;
-    c.topListicles=D.citations[bk].topListicles;
-  } else c=D.citations[bk];
+  /* base citation data: recounted from the raw answers, same as the Overview */
+  c=_buildIntentCitations(bk);
   /* competitor/brand filter setup */
   var compCits=_getCompCits(currentBrand);
   var _brandCitsArr=_buildBrandCits(currentBrand);
