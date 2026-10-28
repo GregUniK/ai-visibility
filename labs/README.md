@@ -23,9 +23,8 @@ the main account allows about 2,000 a day, so don't run it on the same day as a 
 
 ## What the reports show
 
-- **Visibility scores** (last 90 days): visibility score, share of voice, rank vs tracked
-  competitors (a brand no AI named says "Not named"), score per AI, and a score-per-run chart
-  for the brand and each tracked competitor.
+- **Visibility scores** (last 90 days): visibility score, share of voice, score per AI, and a
+  score-per-run chart for the brand and each tracked competitor.
 - **Tracked competitors** split from every other name the AIs mention (regulators,
   comparison sites, other banks). The brand's own name variants are not counted as competitors.
 - **Fan-out searches**: the web searches ChatGPT and Gemini ran while answering each prompt
