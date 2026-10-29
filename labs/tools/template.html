@@ -43,7 +43,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .stab.active{color:var(--v-text);border-bottom-color:var(--v);font-weight:600}
 .wrap{max-width:1260px;margin:0 auto;padding:0 28px}
 .stat-strip{padding:18px 0 4px}
-.stat-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
 .stat-card{background:var(--paper);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}
 .sc-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink4);margin-bottom:6px}
 .sc-val{font-size:26px;font-weight:700;line-height:1;color:var(--ink)}
@@ -270,7 +270,7 @@ tr.dom-row-open .dom-chev{transform:rotate(180deg)}
 .labs-sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:2px 0 8px;flex-wrap:wrap}
 .labs-sec-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
 .labs-sec-sub{font-size:12px;color:var(--ink4)}
-.labs-row{display:grid;grid-template-columns:repeat(3,1fr) 1.7fr;gap:12px;margin-bottom:14px}
+.labs-row{display:grid;grid-template-columns:repeat(2,1fr) 1.7fr;gap:12px;margin-bottom:14px}
 .labs-card{background:var(--paper);border:1px solid var(--border);border-top:3px solid var(--v);border-radius:var(--radius);padding:14px 18px}
 .lm-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 0}
 .lm-row img{width:14px;height:14px;border-radius:3px;flex-shrink:0}
@@ -1129,26 +1129,6 @@ function renderStats(){
   var promptsMentioned=pd.filter(function(p){return activeModel==='all'?p.mentions>0:(p.models[activeModel]&&p.models[activeModel].mentioned);}).length;
   var visPct=totalRuns>0?(mentioned/totalRuns*100).toFixed(1):'0.0';
   var visCls=mentioned===0?'bad':parseFloat(visPct)<5?'warn':'good';
-  var bestScore=Math.max.apply(null,pd.map(function(p){
-    if(activeModel==='all'){
-      return Math.max.apply(null,Object.values(p.models).filter(function(m){return m&&m.score;}).map(function(m){return m.score;}).concat([0]));
-    } else {
-      return (p.models[activeModel]&&p.models[activeModel].score)||0;
-    }
-  }).concat([0]));
-  var bestScoreModel='';
-  if(activeModel!=='all'){
-    bestScoreModel=(MODEL_META[activeModel]||{label:activeModel}).label;
-  } else {
-    var bsm='',bsmVal=0;
-    pd.forEach(function(p){
-      Object.keys(p.models).forEach(function(mk){
-        var mv=p.models[mk];
-        if(mv&&mv.score&&mv.score>bsmVal){bsmVal=mv.score;bsm=mk;}
-      });
-    });
-    if(bsm)bestScoreModel=(MODEL_META[bsm]||{label:bsm}).label;
-  }
   var c=D.citations[bk];
   var citTotal=_buildIntentCitations(bk).total;
   /* sentiment score */
@@ -1170,11 +1150,9 @@ function renderStats(){
   var avgPos=allRanks.length?(allRanks.reduce(function(a,r){return a+r;},0)/allRanks.length).toFixed(1):null;
   var posCls=avgPos===null?'bad':parseFloat(avgPos)<=2?'good':parseFloat(avgPos)<=4?'warn':'bad';
   var infoSvg='<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="6"/><path d="M7 6v4" stroke-linecap="round"/><circle cx="7" cy="4.5" r=".5" fill="currentColor" stroke="none"/></svg>';
-  var bestScoreTip='Highest AI visibility score (0-100) achieved'+(activeModel!=='all'?' for '+(MODEL_META[activeModel]||{label:activeModel}).label:' across all prompts and models')+'. Score reflects prominence and rank in the AI response';
   document.getElementById('statRow').innerHTML=
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Share of AI answers that mention the brand (mentions / runs). Not the visibility score, which also weighs how early the brand appears: see the visibility scores on the Overview.">'+infoSvg+'</span>Mention rate</div><div class="sc-val '+visCls+'">'+visPct+'%</div><div class="sc-sub">'+mentioned+' of '+totalRuns+' model runs include a mention</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Total number of individual AI model query executions across all prompts">'+infoSvg+'</span>Model Runs</div><div class="sc-val">'+totalRuns+'</div><div class="sc-sub">'+promptsMentioned+' of '+pd.length+' prompts trigger a mention</div></div>'+
-    '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="'+bestScoreTip+'">'+infoSvg+'</span>Best Score</div><div class="sc-val '+(bestScore>0?'good':'bad')+'">'+(bestScore>0?bestScore:'None')+'</div><div class="sc-sub">'+(bestScore===100?'Rank 1 by '+(bestScoreModel||'AI'):bestScore>0?'highest ranking'+(bestScoreModel?' by '+bestScoreModel:''):'not ranked by any model')+'</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Total number of source URLs cited by AI models when answering prompts in this brand\'s topic area">'+infoSvg+'</span>Total Citations</div><div class="sc-val" style="color:var(--v)">'+citTotal.toLocaleString()+'</div><div class="sc-sub">'+c.uniqueDomains+' unique domains</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Share of brand mentions rated as positive sentiment out of all detected mentions">'+infoSvg+'</span>Sentiment Score</div><div class="sc-val '+(sentPct===null?'bad':sentCls)+'">'+(sentPct!==null?sentPct+'%':'N/A')+'</div><div class="sc-sub">'+(sentTotal>0?sentPos+' positive of '+sentTotal+' mentions':'no mentions detected')+'</div></div>'+
     '<div class="stat-card"><div class="sc-label"><span class="info-tip" data-tip="Mean rank position across all AI responses where the brand was mentioned. Lower is better (rank 1 = first recommended)">'+infoSvg+'</span>Avg Position</div><div class="sc-val '+(avgPos===null?'bad':posCls)+'">'+(avgPos!==null?'#'+avgPos:'N/A')+'</div><div class="sc-sub">'+(allRanks.length?'across '+allRanks.length+' ranked responses':'no ranked mentions')+'</div></div>';
@@ -1871,19 +1849,6 @@ function _labsCardsHtml(){
   var cards=[];
   if(v&&v.visibility)cards.push(card('Visibility score','Visibility score (0–100): each answer scores higher the earlier the brand appears in it, and answers without the brand score 0.',v.visibility.score+'<span style="font-size:14px;color:var(--ink4);font-weight:600">/100</span>','trend '+esc(v.visibility.trend||'n/a')+' · '+_num(v.visibility.runCount)+' answers'));
   if(v&&v.marketShare)cards.push(card('Share of voice','The brand’s share of all brand mentions (the brand plus every competitor) in the AI answers.',v.marketShare.percentage+'%',_num(v.marketShare.brandMentions)+' of '+_num(v.marketShare.totalMentions)+' brand mentions'));
-  if(cp&&cp.summary&&cp.summary.brandRankAmongCompetitors){
-    /* the API breaks ties in its own order, so a brand that no AI named can come out "#2";
-       the position here is 1 + the competitors with a higher score, and ties are said */
-    var rankTip='Position among the tracked competitors, by visibility score in the latest run.',of=cp.summary.totalCompetitors+1;
-    var bs=cp.brand?cp.brand.score:null,others=(cp.competitors||[]).map(function(c){return c.score;});
-    var known=typeof bs==='number'&&others.length>0&&others.every(function(x){return typeof x==='number';});
-    if(bs===0)cards.push(card('Rank',rankTip,'Not named','no AI named it in the latest run · '+of+' brands tracked'));
-    else{
-      var tied=known?others.filter(function(x){return x===bs;}).length:0;
-      var pos=known?others.filter(function(x){return x>bs;}).length+1:cp.summary.brandRankAmongCompetitors;
-      cards.push(card('Rank',rankTip,'#'+pos+'<span style="font-size:14px;color:var(--ink4);font-weight:600"> of '+of+'</span>',(tied?'tied with '+tied+' · ':'')+'vs tracked competitors · latest run'));
-    }
-  }
   if(bm&&bm.models&&bm.models.length){
     var mx=Math.max.apply(null,bm.models.map(function(m){return m.visibilityScore||0;}).concat([1]));
     var rows=bm.models.slice().sort(function(a,b){return (b.visibilityScore||0)-(a.visibilityScore||0);}).map(function(m){
