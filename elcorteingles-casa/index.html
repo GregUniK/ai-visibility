@@ -1876,8 +1876,8 @@ function _scoreboardHtml(){
       '<td>'+(it.vis===null||it.vis===undefined?'—':it.vis)+'</td><td>'+(it.score===null||it.score===undefined?'—':it.score)+'</td><td>'+chg+'</td><td>'+(it.sent===null||it.sent===undefined?'—':it.sent+'%')+'</td><td>'+(it.pos?'#'+it.pos:'—')+'</td><td>'+(it.visits?_num(it.visits):'—')+'</td></tr>';
   }).join('');
   var w=cp.metricsWindow?_fmtShort(cp.metricsWindow.from)+' to '+_fmtDate(cp.metricsWindow.to):'last 90 days';
-  return '<div class="cc"><div class="cc-head"><div><div class="cc-title">Tracked competitors</div><div class="cc-sub">Visibility, sentiment and position: '+w+' · score and change: latest run · the filters above don’t change this table</div></div></div>'+
-    '<div class="cc-body np sb-wrap"><table class="sb-table"><thead><tr><th>#</th><th>Brand</th><th>Visibility</th><th>Score</th><th>Change</th><th>Positive sentiment</th><th>Avg position</th><th>Monthly visits</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="cc"><div class="cc-head"><div><div class="cc-title">Tracked competitors</div><div class="cc-sub">Visibility, sentiment and position: '+w+' · latest run and change: the visibility score of the most recent run · the filters above don’t change this table</div></div></div>'+
+    '<div class="cc-body np sb-wrap"><table class="sb-table"><thead><tr><th>#</th><th>Brand</th><th>Visibility (90 days)</th><th>Latest run</th><th>Change</th><th>Positive sentiment</th><th>Avg position</th><th>Monthly visits</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 
 /* ── fan-out searches ───────────────────────────────────────────────────── */
